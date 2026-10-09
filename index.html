@@ -1,0 +1,1789 @@
+<!DOCTYPE html>
+<html lang="en" class="dark h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>CineSync Pro - Real-Time Watch Party</title>
+
+  <!-- Tailwind CSS -->
+  <link rel="stylesheet" href="./assets/tailwind.css">
+
+  <!-- PeerJS for WebRTC Peer-to-Peer Synchronization -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@500;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    html, body {
+      min-height: 100%;
+      background-color: #020617;
+      color: #f8fafc;
+      overflow-x: hidden;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.8);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(99, 102, 241, 0.4);
+      border-radius: 9999px;
+    }
+
+    .glass-card {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .glass-card-hover {
+      transition: all 0.25s ease;
+    }
+    .glass-card-hover:hover {
+      border-color: rgba(99, 102, 241, 0.4);
+      box-shadow: 0 8px 32px -8px rgba(79, 70, 229, 0.25);
+    }
+
+    #subtitleOverlay {
+      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.95), 0 0 10px rgba(0, 0, 0, 0.85);
+      pointer-events: none;
+      transition: all 0.15s ease-out;
+    }
+
+    .drag-active {
+      border-color: #6366f1 !important;
+      background: rgba(99, 102, 241, 0.12) !important;
+    }
+
+    .no-select {
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    .progress-bar-fill {
+      background: linear-gradient(90deg, #06b6d4 0%, #6366f1 50%, #a855f7 100%);
+      box-shadow: 0 0 12px rgba(168, 85, 247, 0.65), 0 0 4px rgba(99, 102, 241, 0.9);
+    }
+
+    input[type=range].custom-progress-range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 16px;
+      width: 16px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 2px solid #a855f7;
+      cursor: pointer;
+      box-shadow: 0 0 12px rgba(168, 85, 247, 1);
+      transition: transform 0.15s ease, background-color 0.15s ease;
+    }
+    input[type=range].custom-progress-range::-webkit-slider-thumb:hover {
+      transform: scale(1.35);
+      background: #06b6d4;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen flex flex-col font-sans antialiased text-slate-100 bg-slate-950 selection:bg-indigo-500 selection:text-white">
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="fixed top-5 right-5 z-50 flex flex-col gap-2 max-w-xs sm:max-w-sm pointer-events-none"></div>
+
+  <header class="glass-card sticky top-0 z-40 px-4 py-3 border-b border-slate-800/80 flex items-center justify-between shrink-0">
+    <!-- Brand Logo -->
+    <div id="navLogo" class="flex items-center gap-3 cursor-pointer group">
+      <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-indigo-500/30 group-hover:scale-105 transition-transform">
+        <i class="fa-solid fa-play text-white text-base sm:text-lg ml-0.5"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="font-display font-black text-lg sm:text-xl tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-indigo-300">
+            CineSync<span class="text-indigo-400">Pro</span>
+          </h1>
+          <span class="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 hidden xs:inline-block">v3.1</span>
+        </div>
+        <p class="text-[11px] text-slate-400 font-medium hidden md:block">Real-Time Collaborative Local Movie Party</p>
+      </div>
+    </div>
+
+    <!-- Active Room Status Badge -->
+    <div id="roomHeaderInfo" class="hidden items-center gap-2 sm:gap-3 bg-slate-900/90 border border-slate-800 rounded-full px-3 py-1">
+      <div class="flex items-center gap-1.5 text-[11px] sm:text-xs font-semibold text-emerald-400 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+        <span id="syncPulseDot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span id="syncStatusText">SYNCED</span>
+      </div>
+
+      <div class="text-xs sm:text-sm font-mono font-bold text-slate-200 tracking-wide flex items-center gap-1">
+        <span class="text-slate-400 hidden sm:inline">ROOM:</span>
+        <span id="displayRoomCode" class="text-indigo-400 font-mono select-all">------</span>
+      </div>
+
+      <button id="copyRoomCodeBtn" title="Copy Room Code" class="p-1.5 text-slate-400 hover:text-indigo-300 hover:bg-slate-800 rounded-full transition-colors">
+        <i class="fa-regular fa-copy text-xs"></i>
+      </button>
+
+      <button id="shareLinkBtn" title="Copy Invite Link" class="p-1.5 text-slate-400 hover:text-indigo-300 hover:bg-slate-800 rounded-full transition-colors hidden sm:inline-flex">
+        <i class="fa-solid fa-share-nodes text-xs"></i>
+      </button>
+    </div>
+
+    <!-- User Profile & Action Controls -->
+    <div class="flex items-center gap-2 sm:gap-3">
+      <button id="profileModalBtn" class="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 px-2.5 py-1.5 rounded-full transition-all">
+        <div id="userAvatarCircle" class="w-6 h-6 rounded-full bg-indigo-500 flex items-center justify-center text-xs font-bold text-white">G</div>
+        <span id="navUserName" class="text-xs font-semibold text-slate-200 max-w-[80px] sm:max-w-[100px] truncate">Guest</span>
+        <i class="fa-solid fa-gear text-[10px] text-slate-500"></i>
+      </button>
+
+      <button id="leaveRoomBtn" class="hidden bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-1.5 rounded-full text-xs font-semibold transition-all items-center gap-1.5">
+        <i class="fa-solid fa-right-from-bracket"></i>
+        <span class="hidden sm:inline">Leave</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="flex-1 flex flex-col relative w-full overflow-y-auto">
+
+    <!-- LANDING HERO SCREEN -->
+    <div id="landingScreen" class="w-full flex-1 flex flex-col items-center justify-center p-4 sm:p-8 relative min-h-[calc(100vh-65px)]">
+      <div class="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] sm:w-[600px] h-[300px] sm:h-[600px] bg-indigo-600/10 rounded-full blur-[100px] sm:blur-[140px] pointer-events-none"></div>
+
+      <div class="max-w-4xl w-full mx-auto text-center space-y-6 sm:space-y-8 z-10 my-auto py-6">
+        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold tracking-wide uppercase shadow-inner">
+          <i class="fa-solid fa-shield-halved text-indigo-400"></i>
+          100% Private • Peer-to-Peer • Zero Server Upload
+        </div>
+
+        <h2 class="text-3xl sm:text-5xl md:text-6xl font-display font-black tracking-tight text-white leading-tight">
+          Watch Movies Together.<br>
+          <span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-cyan-300 to-purple-400">
+            With Audio, Subtitle & VLC Gestures.
+          </span>
+        </h2>
+        <p class="text-slate-400 text-sm sm:text-base max-w-2xl mx-auto font-normal leading-relaxed">
+          Open local `.mp4`, `.mkv`, `.webm` videos, switch audio & subtitle tracks, use VLC-style swipe brightness/volume gestures, and sync playback with friends seamlessly.
+        </p>
+
+        <!-- Main Action Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-2xl mx-auto pt-2 text-left">
+          
+          <!-- Create Room Card -->
+          <div class="glass-card p-6 rounded-2xl flex flex-col justify-between glass-card-hover group shadow-2xl">
+            <div>
+              <div class="w-12 h-12 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 text-2xl mb-4 group-hover:scale-110 transition-transform">
+                <i class="fa-solid fa-plus"></i>
+              </div>
+              <h3 class="text-lg font-bold text-white mb-1">Create Watch Party</h3>
+              <p class="text-xs text-slate-400">Host a watch party with a fresh unique code each time and share it with friends.</p>
+            </div>
+            <button id="createRoomBtn" class="mt-6 w-full py-3 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-bold text-sm shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all active:scale-[0.98]">
+              <i class="fa-solid fa-tv"></i>
+              <span>Start New Party</span>
+            </button>
+          </div>
+
+          <!-- Join Room Card -->
+          <div class="glass-card p-6 rounded-2xl flex flex-col justify-between glass-card-hover group shadow-2xl">
+            <div>
+              <div class="w-12 h-12 rounded-xl bg-cyan-600/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400 text-2xl mb-4 group-hover:scale-110 transition-transform">
+                <i class="fa-solid fa-right-to-bracket"></i>
+              </div>
+              <h3 class="text-lg font-bold text-white mb-1">Join Watch Party</h3>
+              <p class="text-xs text-slate-400">Enter host's room code or invite link to join the synchronization room instantly.</p>
+            </div>
+            <div class="mt-6 space-y-3">
+              <input type="text" id="joinRoomCodeInput" placeholder="Enter Room Code (e.g. CINE-7890)" class="w-full uppercase tracking-widest font-mono bg-slate-900/90 border border-slate-700 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-white placeholder-slate-500 outline-none transition-all">
+              <button id="joinRoomBtn" class="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98]">
+                <span>Join Party</span>
+                <i class="fa-solid fa-arrow-right text-xs"></i>
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="pt-6 border-t border-slate-800/80 max-w-3xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-4 text-slate-400 text-xs">
+          <div class="flex items-center gap-3 justify-center sm:justify-start">
+            <i class="fa-solid fa-sliders text-indigo-400 text-lg"></i>
+            <span>VLC Left/Right Swipe Gestures</span>
+          </div>
+          <div class="flex items-center gap-3 justify-center sm:justify-start">
+            <i class="fa-solid fa-heart text-pink-400 text-lg"></i>
+            <span>Romance & Cringe Reactions</span>
+          </div>
+          <div class="flex items-center gap-3 justify-center sm:justify-start">
+            <i class="fa-solid fa-key text-emerald-400 text-lg"></i>
+            <span>Isolated Local Brightness & Volume</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- THEATER WATCH ROOM SCREEN -->
+    <div id="roomScreen" class="hidden w-full flex-1 flex flex-col lg:flex-row min-h-0 lg:h-[calc(100vh-65px)] overflow-y-auto lg:overflow-hidden">
+      
+      <!-- MAIN THEATER STAGE -->
+      <div class="flex-1 flex flex-col bg-black relative min-h-0 overflow-y-auto no-select">
+        
+        <!-- Video Container -->
+        <div id="videoContainer" class="relative w-full aspect-video sm:aspect-auto sm:flex-1 bg-slate-950 flex items-center justify-center min-h-[260px] sm:min-h-[380px] overflow-hidden group touch-none select-none">
+          
+          <!-- Native HTML5 Video Element -->
+          <video id="videoPlayer" class="w-full h-full object-contain max-h-[80vh] transition-[filter] duration-75" preload="metadata" crossorigin="anonymous" playsinline>
+            Your browser does not support HTML5 video.
+          </video>
+
+          <!-- VLC GESTURE VISUAL HUD OVERLAY -->
+          <div id="hudOverlay" class="absolute inset-0 pointer-events-none z-40 flex items-center justify-center opacity-0 transition-opacity duration-200">
+            <div class="bg-slate-900/90 border border-indigo-500/40 backdrop-blur-md px-6 py-4 rounded-2xl flex flex-col items-center gap-2 shadow-2xl min-w-[140px]">
+              <i id="hudIcon" class="fa-solid fa-sun text-2xl text-indigo-400"></i>
+              <span id="hudText" class="font-mono font-bold text-xs text-slate-100">Brightness 100%</span>
+              <div class="w-28 h-1.5 bg-slate-800 rounded-full overflow-hidden mt-1">
+                <div id="hudBar" class="h-full bg-gradient-to-r from-indigo-500 to-cyan-400 rounded-full transition-all duration-75" style="width: 100%"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dynamic Custom Subtitle Text Overlay Box -->
+          <div id="subtitleOverlay" class="absolute bottom-16 left-1/2 -translate-x-1/2 max-w-[90%] text-center z-20 pointer-events-none px-4 py-1.5 rounded-lg transition-all hidden">
+            <p id="subtitleText" class="font-medium leading-normal tracking-wide drop-shadow-lg break-words">
+              <!-- Subtitles render here -->
+            </p>
+          </div>
+
+          <!-- Floating Emoji Animations Layer -->
+          <div id="reactionLayer" class="absolute inset-0 pointer-events-none overflow-hidden z-30"></div>
+
+          <!-- Drag and Drop / No Video Selected Overlay -->
+          <div id="noVideoOverlay" class="absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center p-4 sm:p-6 text-center z-20 transition-all overflow-y-auto">
+            <div id="dropZone" class="max-w-lg w-full p-6 sm:p-8 border-2 border-dashed border-indigo-500/40 hover:border-indigo-500 rounded-3xl bg-indigo-950/20 flex flex-col items-center gap-4 transition-all cursor-pointer">
+              <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 text-2xl sm:text-3xl animate-bounce">
+                <i class="fa-solid fa-file-video"></i>
+              </div>
+              <div>
+                <h3 class="text-lg sm:text-xl font-bold text-white mb-1">Select or Drag Movie File Here</h3>
+                <p class="text-slate-400 text-xs">Supports `.mp4`, `.mkv`, `.webm`, `.mov`. Switch embedded audio/subtitle tracks on the fly!</p>
+              </div>
+              <div class="flex flex-wrap gap-3 justify-center pt-2">
+                <label class="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs cursor-pointer transition-all shadow-lg shadow-indigo-600/30 flex items-center gap-2">
+                  <i class="fa-solid fa-folder-open"></i> Browse Video
+                  <input type="file" id="videoFileInput" accept="video/*,.mkv" class="hidden">
+                </label>
+                <button id="sampleMovieBtn" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold flex items-center gap-2 transition-all">
+                  <i class="fa-solid fa-film"></i> Try Demo Clip
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- CUSTOM VIDEO CONTROLS OVERLAY -->
+          <div id="videoControls" class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/80 to-transparent p-3 sm:p-4 opacity-100 transition-opacity duration-300 z-30">
+            
+            <!-- Progress Bar Container -->
+            <div id="seekBarContainer" class="relative w-full flex items-center mb-3 group/seek cursor-pointer py-1">
+              <div class="w-full h-2 bg-slate-800/90 rounded-full overflow-hidden relative shadow-inner">
+                <div id="seekBarFill" class="h-full progress-bar-fill rounded-full transition-all duration-75 relative" style="width: 0%"></div>
+              </div>
+              <input type="range" id="seekBar" min="0" max="100" value="0" step="0.05" class="custom-progress-range absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+              <div id="seekTooltip" class="absolute bottom-6 -translate-x-1/2 pointer-events-none opacity-0 group-hover/seek:opacity-100 transition-opacity bg-slate-900/95 border border-purple-500/40 text-purple-200 text-[11px] font-mono px-2 py-0.5 rounded shadow-xl whitespace-nowrap z-20">
+                00:00:00
+              </div>
+            </div>
+
+            <!-- Lower Control Bar -->
+            <div class="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+              <div class="flex items-center gap-2 sm:gap-3">
+                <button id="playPauseBtn" class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center transition-all shadow-lg active:scale-95 shrink-0">
+                  <i class="fa-solid fa-play text-xs sm:text-sm ml-0.5"></i>
+                </button>
+
+                <div class="text-[11px] sm:text-xs font-mono text-slate-300 flex items-center gap-1">
+                  <span id="currentTimeDisplay">00:00:00</span>
+                  <span class="text-slate-600">/</span>
+                  <span id="durationDisplay">00:00:00</span>
+                </div>
+
+                <div class="hidden sm:flex items-center gap-2">
+                  <button id="muteBtn" class="text-slate-300 hover:text-white text-xs p-1">
+                    <i class="fa-solid fa-volume-high"></i>
+                  </button>
+                  <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1" class="w-14 sm:w-16 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                </div>
+              </div>
+
+              <div class="flex items-center gap-1.5 sm:gap-2">
+                <div id="audioTrackSelectContainer" class="flex items-center bg-slate-900/90 border border-slate-700 rounded-lg px-2 py-1 text-[10px] sm:text-xs">
+                  <i class="fa-solid fa-music text-cyan-400 mr-1.5"></i>
+                  <select id="audioTrackSelect" class="bg-transparent text-slate-200 outline-none cursor-pointer font-medium max-w-[90px] sm:max-w-[130px] truncate">
+                    <option value="default">Audio: Default</option>
+                  </select>
+                </div>
+
+                <div id="subTrackSelectContainer" class="flex items-center bg-slate-900/90 border border-slate-700 rounded-lg px-2 py-1 text-[10px] sm:text-xs">
+                  <i class="fa-solid fa-closed-captioning text-indigo-400 mr-1.5"></i>
+                  <select id="subTrackSelect" class="bg-transparent text-slate-200 outline-none cursor-pointer font-medium max-w-[95px] sm:max-w-[140px] truncate">
+                    <option value="off">Subtitles: OFF</option>
+                  </select>
+                </div>
+
+                <select id="speedSelect" class="bg-slate-900/90 border border-slate-700 text-slate-200 text-[10px] sm:text-xs rounded-lg px-1.5 py-1 outline-none cursor-pointer">
+                  <option value="0.5">0.5x</option>
+                  <option value="0.75">0.75x</option>
+                  <option value="1.0" selected>1.0x</option>
+                  <option value="1.25">1.25x</option>
+                  <option value="1.5">1.5x</option>
+                  <option value="2.0">2.0x</option>
+                </select>
+
+                <button id="fullscreenBtn" title="Fullscreen" class="p-1.5 text-slate-300 hover:text-white transition-colors">
+                  <i class="fa-solid fa-expand text-xs sm:text-sm"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- BOTTOM TOOLBAR -->
+        <div class="bg-slate-900/95 border-t border-slate-800 p-2.5 sm:p-3 flex flex-wrap items-center justify-between gap-3 shrink-0">
+          
+          <div class="flex flex-wrap items-center gap-2 text-xs">
+            
+            <button id="unloadVideoBtn" title="Remove currently loaded movie" class="hidden px-2.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 font-semibold transition-all flex items-center gap-1.5">
+              <i class="fa-solid fa-trash-can"></i>
+              <span>Unload Movie</span>
+            </button>
+
+            <label class="px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 font-semibold cursor-pointer transition-colors flex items-center gap-1.5">
+              <i class="fa-solid fa-file-lines"></i>
+              <span>Load Subtitle</span>
+              <input type="file" id="subtitleFileInput" accept=".srt,.vtt" class="hidden">
+            </label>
+
+            <div id="subDelayControls" class="hidden items-center bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 gap-1">
+              <span class="text-[10px] text-slate-400 font-medium">Delay:</span>
+              <button id="subDelayMinusBtn" class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono font-bold">-0.5s</button>
+              <span id="subDelayValueDisplay" class="font-mono text-indigo-300 font-bold px-1 text-[11px]">0.0s</span>
+              <button id="subDelayPlusBtn" class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono font-bold">+0.5s</button>
+              <button id="subDelayResetBtn" title="Reset Subtitle Offset" class="p-1 text-slate-500 hover:text-slate-300">
+                <i class="fa-solid fa-rotate-left text-xs"></i>
+              </button>
+            </div>
+
+            <button id="openSubStyleModalBtn" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-semibold transition-colors flex items-center gap-1">
+              <i class="fa-solid fa-sliders text-indigo-400"></i>
+              <span class="hidden sm:inline">Subtitle Style</span>
+            </button>
+          </div>
+
+          <!-- FLOATING EMOJI REACTIONS TOOLBAR -->
+          <div class="flex items-center gap-1 bg-slate-950/90 border border-slate-800 rounded-2xl p-1 overflow-x-auto max-w-full">
+            <div class="flex items-center gap-1 shrink-0 pr-1 border-r border-slate-800 text-[10px] text-slate-400 font-bold uppercase">
+              <span class="hidden md:inline px-1">Reactions:</span>
+            </div>
+            
+            <button class="reaction-trigger p-1.5 hover:bg-slate-800 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🍿" title="Popcorn">🍿</button>
+            <button class="reaction-trigger p-1.5 hover:bg-slate-800 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🤣" title="Lol">🤣</button>
+            <button class="reaction-trigger p-1.5 hover:bg-slate-800 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="😱" title="Shocked">😱</button>
+            <button class="reaction-trigger p-1.5 hover:bg-slate-800 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🔥" title="Fire">🔥</button>
+
+            <span class="text-[9px] text-pink-400/70 font-mono px-1 shrink-0 font-bold border-l border-slate-800">ROMANCE</span>
+            <button class="reaction-trigger p-1.5 hover:bg-pink-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="💖" title="Sparkling Heart">💖</button>
+            <button class="reaction-trigger p-1.5 hover:bg-pink-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🥺" title="Pleading Eyes">🥺</button>
+            <button class="reaction-trigger p-1.5 hover:bg-pink-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🫣" title="Peeking">🫣</button>
+            <button class="reaction-trigger p-1.5 hover:bg-pink-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="💋" title="Kiss">💋</button>
+            <button class="reaction-trigger p-1.5 hover:bg-pink-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🥰" title="Smitten">🥰</button>
+
+            <span class="text-[9px] text-amber-400/70 font-mono px-1 shrink-0 font-bold border-l border-slate-800">CRINGE</span>
+            <button class="reaction-trigger p-1.5 hover:bg-amber-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="😬" title="Grimace">😬</button>
+            <button class="reaction-trigger p-1.5 hover:bg-amber-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🤦" title="Facepalm">🤦</button>
+            <button class="reaction-trigger p-1.5 hover:bg-amber-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🤮" title="Disgust">🤮</button>
+            <button class="reaction-trigger p-1.5 hover:bg-amber-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="💀" title="Dead">💀</button>
+            <button class="reaction-trigger p-1.5 hover:bg-amber-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🤡" title="Clown">🤡</button>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- RIGHT SIDEBAR (Chat & Participants Drawer) -->
+      <div class="w-full lg:w-80 lg:min-w-[320px] bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-800 flex flex-col h-[380px] lg:h-full shrink-0">
+        
+        <div class="flex border-b border-slate-800 bg-slate-950/60 shrink-0">
+          <button id="tabChatBtn" class="flex-1 py-3 font-semibold text-xs border-b-2 border-indigo-500 text-indigo-400 flex items-center justify-center gap-2 transition-colors">
+            <i class="fa-solid fa-comments"></i>
+            <span>Live Chat</span>
+          </button>
+          <button id="tabUsersBtn" class="flex-1 py-3 font-semibold text-xs border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center justify-center gap-2 transition-colors">
+            <i class="fa-solid fa-users"></i>
+            <span>Peers</span>
+            <span id="userCountBadge" class="bg-indigo-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">1</span>
+          </button>
+        </div>
+
+        <!-- CHAT TAB -->
+        <div id="tabChatContent" class="flex-1 flex flex-col min-h-0">
+          <div id="chatMessageContainer" class="flex-1 p-3 overflow-y-auto space-y-3 text-xs">
+            <div class="p-3 rounded-xl bg-indigo-950/40 border border-indigo-500/20 text-indigo-200 space-y-1">
+              <div class="font-bold flex items-center gap-1.5 text-indigo-300">
+                <i class="fa-solid fa-sparkles"></i> CineSync Pro v3.1 Active!
+              </div>
+              <p class="text-[11px] leading-relaxed text-indigo-300/80">
+                Includes movie unloading, romance & cringe reaction packs, unique room code generation, and low-latency peer sync.
+              </p>
+            </div>
+          </div>
+
+          <form id="chatForm" class="p-2.5 border-t border-slate-800 bg-slate-950 flex items-center gap-2 shrink-0">
+            <input type="text" id="chatInput" placeholder="Send message..." class="flex-1 bg-slate-900 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 outline-none transition-all">
+            <button type="submit" class="p-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-colors flex items-center justify-center w-8 h-8 shrink-0">
+              <i class="fa-solid fa-paper-plane"></i>
+            </button>
+          </form>
+        </div>
+
+        <!-- PARTICIPANTS TAB -->
+        <div id="tabUsersContent" class="hidden flex-1 p-3 overflow-y-auto space-y-2 text-xs">
+          <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Connected Friends</div>
+          <div id="participantsList" class="space-y-2"></div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- MODALS -->
+  
+  <!-- Profile Customization Modal -->
+  <div id="profileModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="glass-card max-w-sm w-full rounded-2xl p-6 space-y-5 border border-slate-800 shadow-2xl">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-user-pen text-indigo-400"></i>
+          User Profile
+        </h3>
+        <button id="closeProfileModalBtn" class="text-slate-400 hover:text-white p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="text-xs font-semibold text-slate-400 mb-1.5 block">Your Nickname</label>
+          <input type="text" id="editNicknameInput" class="w-full bg-slate-900 border border-slate-700 focus:border-indigo-500 rounded-xl px-3 py-2.5 text-xs text-white outline-none">
+        </div>
+
+        <div>
+          <label class="text-xs font-semibold text-slate-400 mb-1.5 block">Avatar Color</label>
+          <div class="flex items-center gap-2" id="avatarColorPicker">
+            <button class="color-opt w-8 h-8 rounded-full bg-indigo-500 ring-2 ring-white" data-color="#6366f1"></button>
+            <button class="color-opt w-8 h-8 rounded-full bg-cyan-500" data-color="#06b6d4"></button>
+            <button class="color-opt w-8 h-8 rounded-full bg-rose-500" data-color="#f43f5e"></button>
+            <button class="color-opt w-8 h-8 rounded-full bg-emerald-500" data-color="#10b981"></button>
+            <button class="color-opt w-8 h-8 rounded-full bg-amber-500" data-color="#f59e0b"></button>
+            <button class="color-opt w-8 h-8 rounded-full bg-purple-500" data-color="#a855f7"></button>
+          </div>
+        </div>
+      </div>
+
+      <button id="saveProfileBtn" class="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 transition-all">
+        Save Profile
+      </button>
+    </div>
+  </div>
+
+  <!-- Subtitle Style Config Modal -->
+  <div id="subStyleModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="glass-card max-w-md w-full rounded-2xl p-6 space-y-5 border border-slate-800 shadow-2xl">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-sliders text-indigo-400"></i>
+          Subtitle Customization
+        </h3>
+        <button id="closeSubStyleModalBtn" class="text-slate-400 hover:text-white p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="space-y-4 text-xs">
+        <div>
+          <label class="text-slate-400 font-semibold mb-1.5 block">Font Size</label>
+          <select id="subFontSizeSelect" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-slate-200 outline-none">
+            <option value="16px">Small (16px)</option>
+            <option value="22px" selected>Medium (22px)</option>
+            <option value="28px">Large (28px)</option>
+            <option value="34px">Extra Large (34px)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="text-slate-400 font-semibold mb-1.5 block">Text Color</label>
+          <div class="flex items-center gap-3">
+            <input type="color" id="subTextColorInput" value="#ffffff" class="w-9 h-9 rounded cursor-pointer bg-transparent border-0">
+            <span id="subTextColorHex" class="font-mono text-slate-300">#ffffff</span>
+          </div>
+        </div>
+
+        <div>
+          <label class="text-slate-400 font-semibold mb-1.5 block">Background Box Opacity</label>
+          <div class="flex items-center gap-3">
+            <input type="range" id="subBgOpacitySlider" min="0" max="1" step="0.1" value="0.7" class="flex-1 accent-indigo-500">
+            <span id="subBgOpacityVal" class="font-mono text-indigo-300 w-8">70%</span>
+          </div>
+        </div>
+
+        <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 text-center min-h-[70px] flex items-center justify-center">
+          <span id="subPreviewSample" class="p-1.5 rounded transition-all">
+            Sample Subtitle Preview Text
+          </span>
+        </div>
+      </div>
+
+      <button id="applySubStyleBtn" class="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30">
+        Apply Settings
+      </button>
+    </div>
+  </div>
+
+  <script type="module">
+    /* ==========================================================================
+       CINASYNC PRO V3.1 ENGINE
+       ========================================================================== */
+
+    let peer = null;
+    let roomCode = null;
+    let isHost = false;
+    let activeConnections = [];
+    let peerKeepAliveInterval = null;
+
+    let myProfile = {
+      id: 'usr_' + Math.random().toString(36).substr(2, 7),
+      name: 'User_' + Math.floor(1000 + Math.random() * 9000),
+      color: '#6366f1'
+    };
+
+    let peersList = [];
+
+    // Video & Subtitle State
+    let videoObjectUrl = null;
+    let subtitleCues = [];
+    let loadedSubFileName = '';
+    let subtitleDelay = 0;
+    let activeSubTrackMode = 'off';
+    let activeEmbeddedSubText = '';
+
+    // Remote Sync state
+    let isRemoteCommand = false;
+    let heartbeatInterval = null;
+    let controlsTimeout = null;
+
+    // Local Device VLC Controls State
+    let localBrightness = 1.0; // 0.1 to 1.5 scale
+    let touchStartY = 0;
+    let touchStartX = 0;
+    let isDraggingGesture = false;
+    let initialGestureValue = 0;
+    let gestureZone = null; // 'left', 'right', or 'center'
+
+    let subStyle = {
+      fontSize: '22px',
+      color: '#ffffff',
+      bgOpacity: 0.7
+    };
+
+    // DOM Elements
+    const landingScreen = document.getElementById('landingScreen');
+    const roomScreen = document.getElementById('roomScreen');
+    const roomHeaderInfo = document.getElementById('roomHeaderInfo');
+    const displayRoomCode = document.getElementById('displayRoomCode');
+    const syncStatusText = document.getElementById('syncStatusText');
+    const syncPulseDot = document.getElementById('syncPulseDot');
+    const leaveRoomBtn = document.getElementById('leaveRoomBtn');
+
+    const navUserName = document.getElementById('navUserName');
+    const userAvatarCircle = document.getElementById('userAvatarCircle');
+
+    const videoContainer = document.getElementById('videoContainer');
+    const videoPlayer = document.getElementById('videoPlayer');
+    const videoControls = document.getElementById('videoControls');
+    const hudOverlay = document.getElementById('hudOverlay');
+    const hudIcon = document.getElementById('hudIcon');
+    const hudText = document.getElementById('hudText');
+    const hudBar = document.getElementById('hudBar');
+
+    const noVideoOverlay = document.getElementById('noVideoOverlay');
+    const dropZone = document.getElementById('dropZone');
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const unloadVideoBtn = document.getElementById('unloadVideoBtn');
+    
+    const seekBarContainer = document.getElementById('seekBarContainer');
+    const seekBar = document.getElementById('seekBar');
+    const seekBarFill = document.getElementById('seekBarFill');
+    const seekTooltip = document.getElementById('seekTooltip');
+
+    const currentTimeDisplay = document.getElementById('currentTimeDisplay');
+    const durationDisplay = document.getElementById('durationDisplay');
+    const volumeSlider = document.getElementById('volumeSlider');
+    const muteBtn = document.getElementById('muteBtn');
+    const speedSelect = document.getElementById('speedSelect');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+
+    const audioTrackSelect = document.getElementById('audioTrackSelect');
+    const subTrackSelect = document.getElementById('subTrackSelect');
+
+    const subtitleOverlay = document.getElementById('subtitleOverlay');
+    const subtitleText = document.getElementById('subtitleText');
+    const subDelayControls = document.getElementById('subDelayControls');
+    const subDelayValueDisplay = document.getElementById('subDelayValueDisplay');
+
+    const chatMessageContainer = document.getElementById('chatMessageContainer');
+    const chatForm = document.getElementById('chatForm');
+    const chatInput = document.getElementById('chatInput');
+    const participantsList = document.getElementById('participantsList');
+    const userCountBadge = document.getElementById('userCountBadge');
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      const bgClass = type === 'error' ? 'bg-rose-900/90 border-rose-500/40 text-rose-200' 
+                    : type === 'success' ? 'bg-emerald-900/90 border-emerald-500/40 text-emerald-200' 
+                    : 'bg-indigo-900/90 border-indigo-500/40 text-indigo-200';
+
+      toast.className = `pointer-events-auto px-3.5 py-2 rounded-xl border text-xs font-semibold shadow-xl flex items-center gap-2 transform transition-all duration-300 translate-y-2 opacity-0 ${bgClass}`;
+      toast.innerHTML = `<i class="fa-solid ${type === 'error' ? 'fa-triangle-exclamation' : type === 'success' ? 'fa-circle-check' : 'fa-bell'}"></i> <span>${escapeHtml(message)}</span>`;
+
+      container.appendChild(toast);
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', '-translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 3200);
+    }
+
+    // Generate fresh 4-character uppercase unique room code
+    function generateRoomCode() {
+      const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+      let suffix = '';
+      for (let i = 0; i < 4; i++) {
+        suffix += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return `CINE-${suffix}`;
+    }
+
+    function normalizeRoomCode(input) {
+      if (!input) return '';
+      let clean = input.trim().toUpperCase();
+      clean = clean.replace(/^(CINE-)+/, '');
+      return `CINE-${clean}`;
+    }
+
+    // KeepAlive Ping for PeerServer socket
+    function startPeerKeepAlive() {
+      if (peerKeepAliveInterval) clearInterval(peerKeepAliveInterval);
+      peerKeepAliveInterval = setInterval(() => {
+        if (peer && !peer.destroyed && peer.socket && peer.socket._socket && peer.socket._socket.readyState === 1) {
+          try {
+            peer.socket._socket.send(JSON.stringify({ type: 'HEARTBEAT' }));
+          } catch (e) {}
+        }
+      }, 15000);
+    }
+
+    
+    function initPeer(customPeerId = null, onReadyCallback) {
+      if (peerKeepAliveInterval) {
+        clearInterval(peerKeepAliveInterval);
+        peerKeepAliveInterval = null;
+      }
+    
+      if (peer) {
+        peer.destroy();
+        peer = null;
+      }
+    
+      peer = new Peer(customPeerId || undefined, {
+        debug: 2,
+        config: {
+          iceServers: [
+            { urls: "stun:stun.l.google.com:19302" },
+            { urls: "stun:global.stun.twilio.com:3478" }
+          ]
+        }
+      });
+    
+      peer.on("open", (id) => {
+        console.log("PeerJS signaling connected. Peer ID:", id);
+        startPeerKeepAlive();
+      
+        if (onReadyCallback) {
+          onReadyCallback(id);
+        }
+      });
+    
+      peer.on("disconnected", () => {
+        console.error("PeerJS disconnected from the signaling server.");
+      });
+    
+      peer.on("error", (err) => {
+        console.error("PeerJS error type:", err.type);
+        console.error("PeerJS error details:", err);
+      
+        showToast(`PeerJS ${err.type}: ${err.message}`, "error");
+      });
+    }
+
+
+    function createRoom() {
+      const newCode = generateRoomCode();
+      const peerId = `cinesync-pro-${newCode}`;
+
+      initPeer(peerId, () => {
+        isHost = true;
+        roomCode = newCode;
+        peersList = [{ ...myProfile, isHost: true }];
+        
+        enterTheaterUI();
+        showToast(`Created watch party ${roomCode}!`, 'success');
+
+        peer.on('connection', (conn) => {
+          handleIncomingConnection(conn);
+        });
+
+        if (heartbeatInterval) clearInterval(heartbeatInterval);
+        heartbeatInterval = setInterval(broadcastHostHeartbeat, 2000);
+      });
+    }
+
+    function joinRoom(targetCode) {
+      const cleanCode = normalizeRoomCode(targetCode);
+      if (!cleanCode || cleanCode === 'CINE-') {
+        showToast('Please enter a valid room code.', 'error');
+        return;
+      }
+
+      const hostPeerId = `cinesync-pro-${cleanCode}`;
+
+      initPeer(null, () => {
+        isHost = false;
+        roomCode = cleanCode;
+
+        showToast(`Connecting to ${cleanCode}...`, 'info');
+        const conn = peer.connect(hostPeerId, { reliable: true });
+
+        conn.on('open', () => {
+          activeConnections = [conn];
+          enterTheaterUI();
+          showToast(`Joined watch party ${roomCode}!`, 'success');
+
+          conn.send({
+            type: 'USER_JOIN',
+            user: myProfile
+          });
+
+          setupConnectionListeners(conn);
+        });
+
+        conn.on('error', () => {
+          showToast("Failed to connect. Make sure room code is correct and host is online.", "error");
+        });
+      });
+    }
+
+    function handleIncomingConnection(conn) {
+      conn.on('open', () => {
+        activeConnections.push(conn);
+        setupConnectionListeners(conn);
+
+        conn.send({
+          type: 'ROOM_STATE',
+          playback: {
+            isPlaying: !videoPlayer.paused,
+            currentTime: videoPlayer.currentTime,
+            speed: videoPlayer.playbackRate
+          },
+          peers: peersList
+        });
+      });
+    }
+
+    function setupConnectionListeners(conn) {
+      conn.on('data', (data) => {
+        handleNetworkMessage(data, conn);
+      });
+
+      conn.on('close', () => {
+        activeConnections = activeConnections.filter(c => c !== conn);
+        if (isHost) {
+          peersList = peersList.filter(p => p.peerConnId !== conn.peer);
+          broadcastData({ type: 'PEERS_UPDATE', peers: peersList });
+          renderParticipants();
+        }
+      });
+    }
+
+    function handleNetworkMessage(data, senderConn) {
+      switch (data.type) {
+        case 'USER_JOIN':
+          if (isHost) {
+            const newUser = { ...data.user, peerConnId: senderConn.peer, isHost: false };
+            peersList.push(newUser);
+            broadcastData({ type: 'PEERS_UPDATE', peers: peersList });
+            renderParticipants();
+            appendSystemChatMessage(`${newUser.name} joined room 🎉`);
+          }
+          break;
+
+        case 'PEERS_UPDATE':
+          peersList = data.peers;
+          renderParticipants();
+          break;
+
+        case 'ROOM_STATE':
+          peersList = data.peers;
+          renderParticipants();
+          applyRemoteSyncState(data.playback);
+          break;
+
+        case 'PLAYBACK_ACTION':
+          applyRemotePlaybackAction(data);
+          if (isHost) broadcastData(data, senderConn);
+          break;
+
+        case 'HOST_HEARTBEAT':
+          if (!isHost) applyRemoteSyncState(data.playback);
+          break;
+
+        case 'CHAT_MSG':
+          appendChatMessage(data.msg);
+          if (isHost) broadcastData(data, senderConn);
+          break;
+
+        case 'EMOJI_REACTION':
+          triggerFloatingEmoji(data.emoji);
+          if (isHost) broadcastData(data, senderConn);
+          break;
+      }
+    }
+
+    function broadcastData(data, excludeConn = null) {
+      activeConnections.forEach(conn => {
+        if (conn !== excludeConn && conn.open) {
+          conn.send(data);
+        }
+      });
+    }
+
+    function broadcastHostHeartbeat() {
+      if (!isHost || activeConnections.length === 0) return;
+      broadcastData({
+        type: 'HOST_HEARTBEAT',
+        playback: {
+          isPlaying: !videoPlayer.paused,
+          currentTime: videoPlayer.currentTime,
+          speed: videoPlayer.playbackRate
+        }
+      });
+    }
+
+    function applyRemotePlaybackAction(data) {
+      isRemoteCommand = true;
+
+      if (data.action === 'PLAY') {
+        videoPlayer.currentTime = data.currentTime;
+        videoPlayer.play().catch(() => {});
+        appendSystemChatMessage(`${data.senderName} started playback ▶️`);
+      } else if (data.action === 'PAUSE') {
+        videoPlayer.currentTime = data.currentTime;
+        videoPlayer.pause();
+        appendSystemChatMessage(`${data.senderName} paused video ⏸️`);
+      } else if (data.action === 'SEEK') {
+        videoPlayer.currentTime = data.currentTime;
+        appendSystemChatMessage(`${data.senderName} jumped to ${formatTime(data.currentTime)} ⏩`);
+      } else if (data.action === 'RATE') {
+        videoPlayer.playbackRate = data.rate;
+        speedSelect.value = data.rate.toString();
+      }
+
+      setTimeout(() => { isRemoteCommand = false; }, 300);
+    }
+
+    function applyRemoteSyncState(playback) {
+      if (!playback || !videoPlayer.src) return;
+
+      isRemoteCommand = true;
+
+      if (playback.isPlaying && videoPlayer.paused) {
+        videoPlayer.play().catch(() => {});
+      } else if (!playback.isPlaying && !videoPlayer.paused) {
+        videoPlayer.pause();
+      }
+
+      if (videoPlayer.playbackRate !== playback.speed) {
+        videoPlayer.playbackRate = playback.speed;
+        speedSelect.value = playback.speed.toString();
+      }
+
+      const drift = Math.abs(videoPlayer.currentTime - playback.currentTime);
+      if (drift > 0.5) {
+        videoPlayer.currentTime = playback.currentTime;
+        syncStatusText.textContent = `SYNCING (${Math.round(drift * 1000)}ms)`;
+        syncPulseDot.className = "w-2 h-2 rounded-full bg-amber-400 animate-ping";
+      } else {
+        syncStatusText.textContent = "SYNCED";
+        syncPulseDot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
+      }
+
+      setTimeout(() => { isRemoteCommand = false; }, 300);
+    }
+
+    function emitPlaybackAction(action, extra = {}) {
+      if (isRemoteCommand) return;
+
+      const payload = {
+        type: 'PLAYBACK_ACTION',
+        action: action,
+        senderName: myProfile.name,
+        currentTime: videoPlayer.currentTime,
+        ...extra
+      };
+
+      if (isHost) broadcastData(payload);
+      else if (activeConnections[0]) activeConnections[0].send(payload);
+    }
+
+    /* ==========================================================================
+       VLC-STYLE FULLSCREEN & PLAYER GESTURES (BRIGHTNESS, VOLUME, CENTER TAP)
+       ========================================================================== */
+
+    function showVLCVisualHUD(iconClass, text, percent) {
+      hudIcon.className = `fa-solid ${iconClass} text-2xl text-indigo-400`;
+      hudText.textContent = text;
+      hudBar.style.width = `${Math.min(100, Math.max(0, percent))}%`;
+      
+      hudOverlay.classList.remove('opacity-0');
+      clearTimeout(hudOverlay._timer);
+      hudOverlay._timer = setTimeout(() => {
+        hudOverlay.classList.add('opacity-0');
+      }, 1200);
+    }
+
+    function setLocalBrightness(val) {
+      localBrightness = Math.max(0.1, Math.min(1.5, val));
+      videoPlayer.style.filter = `brightness(${localBrightness})`;
+      const displayPercent = Math.round((localBrightness / 1.5) * 100);
+      showVLCVisualHUD('fa-sun', `Brightness ${displayPercent}%`, displayPercent);
+    }
+
+    function setLocalVolume(val) {
+      const vol = Math.max(0, Math.min(1, val));
+      videoPlayer.volume = vol;
+      volumeSlider.value = vol;
+      videoPlayer.muted = (vol === 0);
+      muteBtn.innerHTML = vol === 0 ? `<i class="fa-solid fa-volume-xmark"></i>` : `<i class="fa-solid fa-volume-high"></i>`;
+      const displayPercent = Math.round(vol * 100);
+      showVLCVisualHUD(vol === 0 ? 'fa-volume-xmark' : 'fa-volume-high', `Volume ${displayPercent}%`, displayPercent);
+    }
+
+    function togglePlaybackControls() {
+      if (videoControls.classList.contains('opacity-0')) {
+        videoControls.classList.remove('opacity-0');
+        autoHideControlsTimer();
+      } else {
+        videoControls.classList.add('opacity-0');
+      }
+    }
+
+    function autoHideControlsTimer() {
+      clearTimeout(controlsTimeout);
+      controlsTimeout = setTimeout(() => {
+        if (!videoPlayer.paused) {
+          videoControls.classList.add('opacity-0');
+        }
+      }, 3500);
+    }
+
+    // Gesture Listeners for Video Container
+    function handleGestureStart(x, y) {
+      const rect = videoContainer.getBoundingClientRect();
+      const relativeX = x - rect.left;
+      const width = rect.width;
+
+      touchStartX = x;
+      touchStartY = y;
+      isDraggingGesture = false;
+
+      // Classify Screen Zones: Left (0-40%), Center (40-60%), Right (60-100%)
+      if (relativeX < width * 0.4) {
+        gestureZone = 'left';
+        initialGestureValue = localBrightness;
+      } else if (relativeX > width * 0.6) {
+        gestureZone = 'right';
+        initialGestureValue = videoPlayer.volume;
+      } else {
+        gestureZone = 'center';
+      }
+    }
+
+    function handleGestureMove(x, y) {
+      const deltaY = touchStartY - y; // Swipe up increases value
+      const deltaX = touchStartX - x;
+
+      if (Math.abs(deltaY) > 8 || Math.abs(deltaX) > 8) {
+        isDraggingGesture = true;
+      }
+
+      if (!isDraggingGesture) return;
+
+      const rect = videoContainer.getBoundingClientRect();
+      const sensitivity = deltaY / (rect.height * 0.6); // Scale gesture sensitivity
+
+      if (gestureZone === 'left') {
+        setLocalBrightness(initialGestureValue + sensitivity * 1.2);
+      } else if (gestureZone === 'right') {
+        setLocalVolume(initialGestureValue + sensitivity);
+      }
+    }
+
+    function handleGestureEnd() {
+      if (!isDraggingGesture) {
+        // Simple Tap Detected
+        if (gestureZone === 'center') {
+          togglePlaybackControls();
+        } else {
+          togglePlaybackControls();
+        }
+      }
+      isDraggingGesture = false;
+      gestureZone = null;
+    }
+
+    // Mouse & Touch Event Handlers
+    videoContainer.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1 && e.target.closest('#videoControls') === null) {
+        handleGestureStart(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    }, { passive: true });
+
+    videoContainer.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 1 && gestureZone) {
+        handleGestureMove(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    }, { passive: true });
+
+    videoContainer.addEventListener('touchend', () => {
+      handleGestureEnd();
+    });
+
+    let isMouseDown = false;
+    videoContainer.addEventListener('mousedown', (e) => {
+      if (e.target.closest('#videoControls') === null) {
+        isMouseDown = true;
+        handleGestureStart(e.clientX, e.clientY);
+      }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (isMouseDown) {
+        handleGestureMove(e.clientX, e.clientY);
+      }
+      autoHideControlsTimer();
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isMouseDown) {
+        isMouseDown = false;
+        handleGestureEnd();
+      }
+    });
+
+    // Track Switchers
+    function detectAndPopulateMediaTracks() {
+      audioTrackSelect.innerHTML = '';
+      const audioTracks = videoPlayer.audioTracks;
+
+      if (audioTracks && audioTracks.length > 0) {
+        for (let i = 0; i < audioTracks.length; i++) {
+          const tr = audioTracks[i];
+          const opt = document.createElement('option');
+          opt.value = i;
+          opt.textContent = `Audio: ${tr.label || tr.language || 'Stream ' + (i + 1)}`;
+          if (tr.enabled) opt.selected = true;
+          audioTrackSelect.appendChild(opt);
+        }
+      } else {
+        const opt = document.createElement('option');
+        opt.value = "0";
+        opt.textContent = "Audio: Main Track";
+        audioTrackSelect.appendChild(opt);
+      }
+
+      populateSubtitleDropdown();
+    }
+
+    function populateSubtitleDropdown() {
+      subTrackSelect.innerHTML = '';
+
+      const optOff = document.createElement('option');
+      optOff.value = 'off';
+      optOff.textContent = 'Subtitles: OFF';
+      subTrackSelect.appendChild(optOff);
+
+      if (subtitleCues.length > 0) {
+        const optCustom = document.createElement('option');
+        optCustom.value = 'custom';
+        optCustom.textContent = `File: ${loadedSubFileName || 'Custom (.srt)'}`;
+        subTrackSelect.appendChild(optCustom);
+      }
+
+      const textTracks = videoPlayer.textTracks;
+      if (textTracks && textTracks.length > 0) {
+        for (let i = 0; i < textTracks.length; i++) {
+          const track = textTracks[i];
+          track.mode = 'hidden';
+
+          const opt = document.createElement('option');
+          opt.value = `embedded_${i}`;
+          opt.textContent = `Embedded: ${track.label || track.language || 'Track ' + (i + 1)}`;
+          subTrackSelect.appendChild(opt);
+
+          track.oncuechange = () => {
+            if (activeSubTrackMode === `embedded_${i}`) {
+              activeEmbeddedSubText = (track.activeCues && track.activeCues.length > 0) ? track.activeCues[0].text : '';
+              renderSubtitles();
+            }
+          };
+        }
+      }
+
+      subTrackSelect.value = activeSubTrackMode;
+    }
+
+    audioTrackSelect.addEventListener('change', (e) => {
+      const selectedIndex = parseInt(e.target.value);
+      const audioTracks = videoPlayer.audioTracks;
+
+      if (audioTracks && audioTracks[selectedIndex]) {
+        for (let i = 0; i < audioTracks.length; i++) {
+          audioTracks[i].enabled = (i === selectedIndex);
+        }
+        const label = audioTracks[selectedIndex].label || audioTracks[selectedIndex].language || `Stream ${selectedIndex + 1}`;
+        showToast(`Switched Audio Track: ${label}`, 'info');
+      }
+    });
+
+    subTrackSelect.addEventListener('change', (e) => {
+      activeSubTrackMode = e.target.value;
+
+      const textTracks = videoPlayer.textTracks;
+      if (textTracks) {
+        for (let i = 0; i < textTracks.length; i++) {
+          textTracks[i].mode = 'hidden';
+        }
+      }
+
+      if (activeSubTrackMode === 'off') {
+        subtitleOverlay.classList.add('hidden');
+        subDelayControls.classList.add('hidden');
+        showToast("Subtitles OFF", "info");
+      } else if (activeSubTrackMode === 'custom') {
+        subDelayControls.classList.remove('hidden');
+        subDelayControls.classList.add('flex');
+        showToast("Switched to Custom Subtitles", "success");
+        renderSubtitles();
+      } else if (activeSubTrackMode.startsWith('embedded_')) {
+        const trackIdx = parseInt(activeSubTrackMode.split('_')[1]);
+        subDelayControls.classList.add('hidden');
+        showToast(`Switched to Embedded Track #${trackIdx + 1}`, "info");
+        renderSubtitles();
+      }
+    });
+
+    // Subtitle File Engine
+    function handleSubtitleFileUpload(file) {
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const text = e.target.result;
+        subtitleCues = parseSubtitleText(text);
+
+        if (subtitleCues.length > 0) {
+          loadedSubFileName = file.name;
+          activeSubTrackMode = 'custom';
+          
+          populateSubtitleDropdown();
+          subTrackSelect.value = 'custom';
+
+          subDelayControls.classList.remove('hidden');
+          subDelayControls.classList.add('flex');
+          
+          showToast(`Loaded ${subtitleCues.length} subtitles!`, 'success');
+          appendSystemChatMessage(`Loaded subtitles: "${file.name}" 💬`);
+          renderSubtitles();
+        } else {
+          showToast("Could not parse subtitle file.", "error");
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function parseSubtitleText(text) {
+      const cues = [];
+      const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      const blocks = normalized.split(/\n\n+/);
+
+      blocks.forEach(block => {
+        const lines = block.trim().split('\n');
+        if (lines.length >= 2) {
+          let timeLineIndex = lines.findIndex(l => l.includes('-->'));
+          if (timeLineIndex !== -1) {
+            const timeMatch = lines[timeLineIndex].match(/(\d{2}:\d{2}:\d{2}[.,]\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}[.,]\d{3})/);
+            if (timeMatch) {
+              const start = parseTimestampToSeconds(timeMatch[1]);
+              const end = parseTimestampToSeconds(timeMatch[2]);
+              const cueText = lines.slice(timeLineIndex + 1).join('<br>').replace(/<[^>]*>/g, '');
+
+              if (!isNaN(start) && !isNaN(end) && cueText) {
+                cues.push({ start, end, text: cueText });
+              }
+            }
+          }
+        }
+      });
+
+      return cues;
+    }
+
+    function parseTimestampToSeconds(str) {
+      const parts = str.replace(',', '.').split(':');
+      if (parts.length === 3) {
+        const hrs = parseFloat(parts[0]);
+        const mins = parseFloat(parts[1]);
+        const secs = parseFloat(parts[2]);
+        return hrs * 3600 + mins * 60 + secs;
+      }
+      return 0;
+    }
+
+    function renderSubtitles() {
+      if (activeSubTrackMode === 'off') {
+        subtitleOverlay.classList.add('hidden');
+        return;
+      }
+
+      if (activeSubTrackMode === 'custom') {
+        const currentTime = videoPlayer.currentTime - subtitleDelay;
+        const activeCue = subtitleCues.find(cue => currentTime >= cue.start && currentTime <= cue.end);
+
+        if (activeCue) {
+          subtitleText.innerHTML = activeCue.text;
+          subtitleOverlay.classList.remove('hidden');
+        } else {
+          subtitleOverlay.classList.add('hidden');
+        }
+      } else if (activeSubTrackMode.startsWith('embedded_')) {
+        if (activeEmbeddedSubText) {
+          subtitleText.innerHTML = activeEmbeddedSubText;
+          subtitleOverlay.classList.remove('hidden');
+        } else {
+          subtitleOverlay.classList.add('hidden');
+        }
+      }
+    }
+
+    // Video Unload/Delete
+    function handleVideoFileSelect(file) {
+      if (videoObjectUrl) URL.revokeObjectURL(videoObjectUrl);
+
+      videoObjectUrl = URL.createObjectURL(file);
+      videoPlayer.src = videoObjectUrl;
+      noVideoOverlay.classList.add('hidden');
+      unloadVideoBtn.classList.remove('hidden');
+
+      showToast(`Opened movie: ${file.name}`, 'info');
+      appendSystemChatMessage(`Selected movie: "${file.name}" 🎬`);
+    }
+
+    function unloadVideo() {
+      if (videoPlayer) {
+        videoPlayer.pause();
+        videoPlayer.removeAttribute('src');
+        videoPlayer.load();
+      }
+      if (videoObjectUrl) {
+        URL.revokeObjectURL(videoObjectUrl);
+        videoObjectUrl = null;
+      }
+
+      noVideoOverlay.classList.remove('hidden');
+      unloadVideoBtn.classList.add('hidden');
+
+      audioTrackSelect.innerHTML = '<option value="default">Audio: Default</option>';
+      subTrackSelect.innerHTML = '<option value="off">Subtitles: OFF</option>';
+      subtitleOverlay.classList.add('hidden');
+      subDelayControls.classList.add('hidden');
+
+      seekBar.value = 0;
+      seekBarFill.style.width = '0%';
+      currentTimeDisplay.textContent = '00:00:00';
+      durationDisplay.textContent = '00:00:00';
+
+      showToast('Movie removed from player.', 'info');
+      appendSystemChatMessage('Movie was unloaded from player 🗑️');
+    }
+
+    unloadVideoBtn.addEventListener('click', unloadVideo);
+
+    videoPlayer.addEventListener('loadedmetadata', () => {
+      detectAndPopulateMediaTracks();
+      updateSeekBarProgress();
+    });
+
+    function enterTheaterUI() {
+      landingScreen.classList.add('hidden');
+      roomScreen.classList.remove('hidden');
+      roomHeaderInfo.classList.remove('hidden');
+      roomHeaderInfo.classList.add('flex');
+      leaveRoomBtn.classList.remove('hidden');
+      leaveRoomBtn.classList.add('inline-flex');
+
+      displayRoomCode.textContent = roomCode;
+
+      const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}?room=${roomCode}`;
+      window.history.pushState({ path: newUrl }, '', newUrl);
+    }
+
+    function leaveRoom() {
+      if (peer) {
+        if (peerKeepAliveInterval) clearInterval(peerKeepAliveInterval);
+        peer.destroy();
+      }
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
+
+      isHost = false;
+      roomCode = null;
+      activeConnections = [];
+      peersList = [];
+
+      unloadVideo();
+
+      landingScreen.classList.remove('hidden');
+      roomScreen.classList.add('hidden');
+      roomHeaderInfo.classList.add('hidden');
+      leaveRoomBtn.classList.add('hidden');
+
+      const cleanUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}`;
+      window.history.pushState({ path: cleanUrl }, '', cleanUrl);
+
+      showToast('Left the watch party.', 'info');
+    }
+
+    // Seek Bar Controls
+    function updateSeekBarProgress() {
+      if (!isNaN(videoPlayer.duration) && videoPlayer.duration > 0) {
+        const percent = (videoPlayer.currentTime / videoPlayer.duration) * 100;
+        seekBar.value = percent;
+        seekBarFill.style.width = `${percent}%`;
+        currentTimeDisplay.textContent = formatTime(videoPlayer.currentTime);
+        durationDisplay.textContent = formatTime(videoPlayer.duration);
+      }
+    }
+
+    videoPlayer.addEventListener('timeupdate', () => {
+      updateSeekBarProgress();
+      renderSubtitles();
+    });
+
+    seekBar.addEventListener('input', () => {
+      if (!isNaN(videoPlayer.duration)) {
+        const targetTime = (seekBar.value / 100) * videoPlayer.duration;
+        seekBarFill.style.width = `${seekBar.value}%`;
+        currentTimeDisplay.textContent = formatTime(targetTime);
+      }
+    });
+
+    seekBar.addEventListener('change', () => {
+      if (!isNaN(videoPlayer.duration)) {
+        const targetTime = (seekBar.value / 100) * videoPlayer.duration;
+        videoPlayer.currentTime = targetTime;
+        emitPlaybackAction('SEEK');
+      }
+    });
+
+    seekBarContainer.addEventListener('mousemove', (e) => {
+      const rect = seekBarContainer.getBoundingClientRect();
+      const posPercent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      
+      if (!isNaN(videoPlayer.duration) && videoPlayer.duration > 0) {
+        const hoverTime = posPercent * videoPlayer.duration;
+        seekTooltip.textContent = formatTime(hoverTime);
+        seekTooltip.style.left = `${posPercent * 100}%`;
+      }
+    });
+
+    // Playback Buttons
+    playPauseBtn.addEventListener('click', () => {
+      if (videoPlayer.paused) {
+        videoPlayer.play().catch(() => {});
+        emitPlaybackAction('PLAY');
+      } else {
+        videoPlayer.pause();
+        emitPlaybackAction('PAUSE');
+      }
+    });
+
+    videoPlayer.addEventListener('play', () => {
+      playPauseBtn.innerHTML = `<i class="fa-solid fa-pause text-xs sm:text-sm"></i>`;
+    });
+
+    videoPlayer.addEventListener('pause', () => {
+      playPauseBtn.innerHTML = `<i class="fa-solid fa-play text-xs sm:text-sm ml-0.5"></i>`;
+    });
+
+    speedSelect.addEventListener('change', (e) => {
+      const rate = parseFloat(e.target.value);
+      videoPlayer.playbackRate = rate;
+      emitPlaybackAction('RATE', { rate });
+    });
+
+    volumeSlider.addEventListener('input', (e) => {
+      setLocalVolume(parseFloat(e.target.value));
+    });
+
+    muteBtn.addEventListener('click', () => {
+      if (videoPlayer.muted) setLocalVolume(videoPlayer.volume || 0.5);
+      else setLocalVolume(0);
+    });
+
+    fullscreenBtn.addEventListener('click', () => {
+      const container = document.getElementById('videoContainer');
+      if (!document.fullscreenElement) {
+        container.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen();
+      }
+    });
+
+    // Subtitle Delay Offset Controls
+    document.getElementById('subDelayMinusBtn').addEventListener('click', () => {
+      subtitleDelay -= 0.5;
+      subDelayValueDisplay.textContent = `${subtitleDelay >= 0 ? '+' : ''}${subtitleDelay.toFixed(1)}s`;
+    });
+
+    document.getElementById('subDelayPlusBtn').addEventListener('click', () => {
+      subtitleDelay += 0.5;
+      subDelayValueDisplay.textContent = `${subtitleDelay >= 0 ? '+' : ''}${subtitleDelay.toFixed(1)}s`;
+    });
+
+    document.getElementById('subDelayResetBtn').addEventListener('click', () => {
+      subtitleDelay = 0;
+      subDelayValueDisplay.textContent = `0.0s`;
+    });
+
+    // Drag and Drop Zone
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('drag-active');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('drag-active');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-active');
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        if (files[0].type.startsWith('video/') || files[0].name.endsWith('.mkv')) {
+          handleVideoFileSelect(files[0]);
+        } else if (files[0].name.endsWith('.srt') || files[0].name.endsWith('.vtt')) {
+          handleSubtitleFileUpload(files[0]);
+        }
+      }
+    });
+
+    document.getElementById('videoFileInput').addEventListener('change', (e) => {
+      if (e.target.files[0]) handleVideoFileSelect(e.target.files[0]);
+    });
+
+    document.getElementById('subtitleFileInput').addEventListener('change', (e) => {
+      if (e.target.files[0]) handleSubtitleFileUpload(e.target.files[0]);
+    });
+
+    document.getElementById('sampleMovieBtn').addEventListener('click', () => {
+      videoPlayer.src = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
+      noVideoOverlay.classList.add('hidden');
+      unloadVideoBtn.classList.remove('hidden');
+      showToast("Loaded Sample Demo Clip", "info");
+    });
+
+    // Emoji Reactions
+    document.querySelectorAll('.reaction-trigger').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const emoji = btn.getAttribute('data-emoji');
+        triggerFloatingEmoji(emoji);
+
+        const payload = { type: 'EMOJI_REACTION', emoji };
+        if (isHost) broadcastData(payload);
+        else if (activeConnections[0]) activeConnections[0].send(payload);
+      });
+    });
+
+    function triggerFloatingEmoji(emoji) {
+      const layer = document.getElementById('reactionLayer');
+      const el = document.createElement('div');
+      el.className = 'absolute text-3xl sm:text-4xl pointer-events-none z-30 animate-float-reaction drop-shadow-md';
+      el.textContent = emoji;
+      el.style.left = `${10 + Math.random() * 80}%`;
+      el.style.bottom = '80px';
+
+      layer.appendChild(el);
+      setTimeout(() => el.remove(), 2400);
+    }
+
+    // Live Chat
+    chatForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const text = chatInput.value.trim();
+      if (!text) return;
+
+      const msg = {
+        senderId: myProfile.id,
+        senderName: myProfile.name,
+        color: myProfile.color,
+        text,
+        timestamp: Date.now()
+      };
+
+      appendChatMessage(msg);
+      chatInput.value = '';
+
+      const payload = { type: 'CHAT_MSG', msg };
+      if (isHost) broadcastData(payload);
+      else if (activeConnections[0]) activeConnections[0].send(payload);
+    });
+
+    function appendChatMessage(msg) {
+      const isMe = msg.senderId === myProfile.id;
+      const dateStr = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      const div = document.createElement('div');
+      div.className = `flex flex-col ${isMe ? 'items-end' : 'items-start'} space-y-1`;
+      div.innerHTML = `
+        <div class="flex items-center gap-1.5 text-[10px] text-slate-400">
+          <span style="color:${msg.color}" class="font-bold">${escapeHtml(msg.senderName)}</span>
+          <span>•</span>
+          <span>${dateStr}</span>
+        </div>
+        <div class="px-3 py-2 rounded-2xl max-w-[85%] break-words ${isMe ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-slate-800 text-slate-200 rounded-bl-none'} shadow">
+          ${escapeHtml(msg.text)}
+        </div>
+      `;
+
+      chatMessageContainer.appendChild(div);
+      chatMessageContainer.scrollTop = chatMessageContainer.scrollHeight;
+    }
+
+    function appendSystemChatMessage(text) {
+      const div = document.createElement('div');
+      div.className = "text-center my-1 text-[10px] text-indigo-300 font-medium bg-indigo-950/40 border border-indigo-500/20 py-1 px-3 rounded-full";
+      div.textContent = text;
+      chatMessageContainer.appendChild(div);
+      chatMessageContainer.scrollTop = chatMessageContainer.scrollHeight;
+    }
+
+    function renderParticipants() {
+      participantsList.innerHTML = '';
+      userCountBadge.textContent = peersList.length;
+
+      peersList.forEach(p => {
+        const item = document.createElement('div');
+        item.className = "flex items-center justify-between p-2 rounded-xl bg-slate-950 border border-slate-800/80";
+        item.innerHTML = `
+          <div class="flex items-center gap-2.5">
+            <div class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white" style="background-color:${p.color || '#6366f1'}">
+              ${p.name.charAt(0).toUpperCase()}
+            </div>
+            <div class="font-semibold text-slate-200 text-xs flex items-center gap-1.5">
+              <span>${escapeHtml(p.name)}</span>
+              ${p.id === myProfile.id ? '<span class="text-[9px] text-slate-500">(You)</span>' : ''}
+            </div>
+          </div>
+          ${p.isHost ? '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-500/20 text-amber-300 border border-amber-500/30"><i class="fa-solid fa-crown text-[9px] mr-1"></i>HOST</span>' : '<span class="w-2 h-2 rounded-full bg-emerald-400"></span>'}
+        `;
+        participantsList.appendChild(item);
+      });
+    }
+
+    // Sidebar Tabs
+    const tabChatBtn = document.getElementById('tabChatBtn');
+    const tabUsersBtn = document.getElementById('tabUsersBtn');
+    const tabChatContent = document.getElementById('tabChatContent');
+    const tabUsersContent = document.getElementById('tabUsersContent');
+
+    tabChatBtn.addEventListener('click', () => {
+      tabChatBtn.className = "flex-1 py-3 font-semibold text-xs border-b-2 border-indigo-500 text-indigo-400 flex items-center justify-center gap-2 transition-colors";
+      tabUsersBtn.className = "flex-1 py-3 font-semibold text-xs border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center justify-center gap-2 transition-colors";
+      tabChatContent.classList.remove('hidden');
+      tabUsersContent.classList.add('hidden');
+    });
+
+    tabUsersBtn.addEventListener('click', () => {
+      tabUsersBtn.className = "flex-1 py-3 font-semibold text-xs border-b-2 border-indigo-500 text-indigo-400 flex items-center justify-center gap-2 transition-colors";
+      tabChatBtn.className = "flex-1 py-3 font-semibold text-xs border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center justify-center gap-2 transition-colors";
+      tabUsersContent.classList.remove('hidden');
+      tabChatContent.classList.add('hidden');
+    });
+
+    // Profile Modal
+    document.getElementById('profileModalBtn').addEventListener('click', () => {
+      document.getElementById('editNicknameInput').value = myProfile.name;
+      document.getElementById('profileModal').classList.remove('hidden');
+    });
+
+    document.getElementById('closeProfileModalBtn').addEventListener('click', () => {
+      document.getElementById('profileModal').classList.add('hidden');
+    });
+
+    document.querySelectorAll('.color-opt').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.color-opt').forEach(b => b.classList.remove('ring-2', 'ring-white'));
+        btn.classList.add('ring-2', 'ring-white');
+        myProfile.color = btn.getAttribute('data-color');
+      });
+    });
+
+    document.getElementById('saveProfileBtn').addEventListener('click', () => {
+      const newName = document.getElementById('editNicknameInput').value.trim();
+      if (newName) {
+        myProfile.name = newName;
+        navUserName.textContent = myProfile.name;
+        userAvatarCircle.textContent = myProfile.name.charAt(0).toUpperCase();
+        userAvatarCircle.style.backgroundColor = myProfile.color;
+
+        document.getElementById('profileModal').classList.add('hidden');
+        showToast("Profile saved!", "success");
+      }
+    });
+
+    // Subtitle Customization Modal
+    const subStyleModal = document.getElementById('subStyleModal');
+    const subFontSizeSelect = document.getElementById('subFontSizeSelect');
+    const subTextColorInput = document.getElementById('subTextColorInput');
+    const subBgOpacitySlider = document.getElementById('subBgOpacitySlider');
+    const subPreviewSample = document.getElementById('subPreviewSample');
+
+    document.getElementById('openSubStyleModalBtn').addEventListener('click', () => {
+      subStyleModal.classList.remove('hidden');
+    });
+
+    document.getElementById('closeSubStyleModalBtn').addEventListener('click', () => {
+      subStyleModal.classList.add('hidden');
+    });
+
+    function updateSubtitleStylePreview() {
+      subStyle.fontSize = subFontSizeSelect.value;
+      subStyle.color = subTextColorInput.value;
+      subStyle.bgOpacity = parseFloat(subBgOpacitySlider.value);
+
+      document.getElementById('subTextColorHex').textContent = subStyle.color;
+      document.getElementById('subBgOpacityVal').textContent = `${Math.round(subStyle.bgOpacity * 100)}%`;
+
+      subPreviewSample.style.fontSize = subStyle.fontSize;
+      subPreviewSample.style.color = subStyle.color;
+      subPreviewSample.style.backgroundColor = `rgba(0, 0, 0, ${subStyle.bgOpacity})`;
+
+      subtitleOverlay.style.fontSize = subStyle.fontSize;
+      subtitleOverlay.style.color = subStyle.color;
+      subtitleOverlay.style.backgroundColor = `rgba(0, 0, 0, ${subStyle.bgOpacity})`;
+    }
+
+    subFontSizeSelect.addEventListener('change', updateSubtitleStylePreview);
+    subTextColorInput.addEventListener('input', updateSubtitleStylePreview);
+    subBgOpacitySlider.addEventListener('input', updateSubtitleStylePreview);
+
+    document.getElementById('applySubStyleBtn').addEventListener('click', () => {
+      updateSubtitleStylePreview();
+      subStyleModal.classList.add('hidden');
+      showToast("Subtitle preferences saved!", "success");
+    });
+
+    // Copy / Share
+    document.getElementById('copyRoomCodeBtn').addEventListener('click', () => {
+      if (roomCode) {
+        copyToClipboard(roomCode);
+        showToast(`Copied Code: ${roomCode}`, 'success');
+      }
+    });
+
+    document.getElementById('shareLinkBtn').addEventListener('click', () => {
+      if (roomCode) {
+        const link = `${window.location.origin}${window.location.pathname}?room=${roomCode}`;
+        copyToClipboard(link);
+        showToast("Invite link copied!", "success");
+      }
+    });
+
+    function copyToClipboard(text) {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
+
+    function formatTime(seconds) {
+      if (isNaN(seconds)) return "00:00:00";
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = Math.floor(seconds % 60);
+      return `${h < 10 ? '0' + h : h}:${m < 10 ? '0' + m : m}:${s < 10 ? '0' + s : s}`;
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>"']/g, function(m) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+      });
+    }
+
+    // App Initialization
+    document.getElementById('createRoomBtn').addEventListener('click', createRoom);
+    document.getElementById('joinRoomBtn').addEventListener('click', () => {
+      const input = document.getElementById('joinRoomCodeInput').value;
+      joinRoom(input);
+    });
+    leaveRoomBtn.addEventListener('click', leaveRoom);
+    document.getElementById('navLogo').addEventListener('click', () => {
+      if (roomCode) leaveRoom();
+    });
+
+    window.addEventListener('load', () => {
+      updateSubtitleStylePreview();
+      const urlParams = new URLSearchParams(window.location.search);
+      const roomParam = urlParams.get('room');
+      if (roomParam) {
+        document.getElementById('joinRoomCodeInput').value = roomParam;
+        joinRoom(roomParam);
+      }
+    });
+  </script>
+</body>
+</html>
