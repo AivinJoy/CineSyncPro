@@ -206,6 +206,89 @@
       }
     }
 
+
+    /* Player hardening: prevent page gestures from competing with media gestures. */
+    html, body { overscroll-behavior: none; }
+    #videoContainer {
+      overscroll-behavior: contain;
+      touch-action: pan-x pan-y;
+      -webkit-tap-highlight-color: transparent;
+      isolation: isolate;
+      contain: layout paint;
+    }
+    #videoContainer, #videoContainer * {
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    #videoContainer input, #videoContainer select, #videoContainer button {
+      touch-action: manipulation;
+    }
+    #videoPlayer, #hudOverlay, #reactionLayer, #subtitleOverlay, #brightnessOverlay {
+      transform: translateZ(0);
+      backface-visibility: hidden;
+    }
+    #brightnessOverlay {
+      position: absolute; inset: 0; z-index: 10; pointer-events: none;
+      background: #000; opacity: 0; transition: opacity 50ms linear;
+    }
+    #videoControls, #hudOverlay, #subtitleOverlay, #reactionLayer,
+    #noVideoOverlay, #fullscreenReactions, #reactionTrayToggle, #reactionTray {
+      padding-bottom: max(0px, env(safe-area-inset-bottom));
+    }
+    #videoContainer:fullscreen {
+      width: 100vw; height: 100dvh; max-height: none; min-height: 0;
+      background: #000; aspect-ratio: auto; border-radius: 0;
+    }
+    #videoContainer:fullscreen #videoPlayer { max-height: none; width: 100%; height: 100%; object-fit: contain; }
+    #videoContainer:fullscreen #videoControls { padding: 16px max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+    #videoContainer:fullscreen #subtitleOverlay { bottom: max(5.5rem, calc(env(safe-area-inset-bottom) + 4rem)); }
+    #videoContainer:fullscreen #fullscreenReactions { display: none; }
+    .reaction-tray-toggle {
+      position: absolute; z-index: 55; top: max(12px, env(safe-area-inset-top));
+      right: max(12px, env(safe-area-inset-right)); width: 42px; height: 42px;
+      border: 1px solid rgba(255,255,255,.18); border-radius: 14px;
+      color: #fff; background: rgba(2,6,23,.78); backdrop-filter: blur(12px);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .reaction-tray {
+      position: absolute; z-index: 54; top: max(60px, calc(env(safe-area-inset-top) + 52px));
+      right: max(12px, env(safe-area-inset-right)); width: min(290px, calc(100% - 24px));
+      max-height: min(70%, 520px); overflow: auto; padding: 14px;
+      border: 1px solid rgba(148,163,184,.24); border-radius: 18px;
+      color: #e2e8f0; background: rgba(2,6,23,.88); backdrop-filter: blur(18px);
+      transform: translateX(calc(100% + 24px)); opacity: 0; pointer-events: none;
+      transition: transform 180ms ease, opacity 180ms ease;
+    }
+    .reaction-tray.open { transform: translateX(0); opacity: 1; pointer-events: auto; }
+    .reaction-tray-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+    .reaction-tray-head button { font-size:24px; line-height:1; padding:0 5px; color:#94a3b8; }
+    .reaction-tray section { margin-top:12px; }
+    .reaction-tray h4 { font-size:11px; font-weight:700; letter-spacing:.04em; color:#a5b4fc; margin-bottom:7px; }
+    .reaction-pack { display:flex; flex-wrap:wrap; gap:6px; }
+    .reaction-pack button { font-size:22px; padding:5px 8px; border-radius:10px; background:rgba(30,41,59,.8); }
+    .reaction-pack button:active { transform:scale(.92); }
+    .floating-reaction {
+      position:absolute; bottom:8%; left:var(--x); font-size:clamp(28px,5vw,48px);
+      will-change:transform, opacity; animation: reaction-rise 2.2s cubic-bezier(.2,.7,.2,1) forwards;
+      filter:drop-shadow(0 3px 8px rgba(0,0,0,.45));
+    }
+    @keyframes reaction-rise {
+      0% { transform:translate3d(0,0,0) scale(.75) rotate(-8deg); opacity:0; }
+      12% { opacity:1; }
+      100% { transform:translate3d(var(--drift),-75vh,0) scale(1.18) rotate(12deg); opacity:0; }
+    }
+    @media (max-width:639px) {
+      #videoContainer { touch-action: none; }
+      #videoContainer:fullscreen #videoControls { gap:8px; }
+      #videoContainer:fullscreen #videoControls > div:last-child { flex-wrap:wrap; justify-content:flex-end; }
+      #videoContainer:fullscreen #videoControls select { max-width: min(27vw,120px); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .floating-reaction { animation-duration: 1ms; }
+      .reaction-tray { transition:none; }
+    }
+
   </style>
 </head>
 
@@ -358,6 +441,33 @@
           <video id="videoPlayer" class="w-full h-full object-contain max-h-[80vh] transition-[filter] duration-75" preload="metadata" crossorigin="anonymous" playsinline>
             Your browser does not support HTML5 video.
           </video>
+
+          <!-- Local dimming layer; all fullscreen UI stays inside #videoContainer. -->
+          <div id="brightnessOverlay" aria-hidden="true"></div>
+
+          <!-- Fullscreen-safe quick reaction drawer -->
+          <button id="reactionTrayToggle" type="button" aria-label="Open reactions" aria-expanded="false"
+            title="Reactions" class="reaction-tray-toggle">
+            <i class="fa-solid fa-face-smile"></i>
+          </button>
+          <aside id="reactionTray" class="reaction-tray" aria-label="Quick reactions" aria-hidden="true">
+            <div class="reaction-tray-head">
+              <strong>Quick reactions</strong>
+              <button id="reactionTrayClose" type="button" aria-label="Close reactions">×</button>
+            </div>
+            <section><h4>Romance Pack 💖</h4><div class="reaction-pack">
+              <button class="reaction-trigger" data-emoji="💖">💖</button><button class="reaction-trigger" data-emoji="🥺">🥺</button>
+              <button class="reaction-trigger" data-emoji="🥰">🥰</button><button class="reaction-trigger" data-emoji="💋">💋</button>
+            </div></section>
+            <section><h4>Cringe Pack 😬</h4><div class="reaction-pack">
+              <button class="reaction-trigger" data-emoji="😬">😬</button><button class="reaction-trigger" data-emoji="🤦">🤦</button>
+              <button class="reaction-trigger" data-emoji="💀">💀</button><button class="reaction-trigger" data-emoji="🤡">🤡</button>
+            </div></section>
+            <section><h4>Comedy Pack 😂</h4><div class="reaction-pack">
+              <button class="reaction-trigger" data-emoji="😂">😂</button><button class="reaction-trigger" data-emoji="🤣">🤣</button>
+              <button class="reaction-trigger" data-emoji="🍿">🍿</button><button class="reaction-trigger" data-emoji="😱">😱</button>
+            </div></section>
+          </aside>
 
           <!-- VLC GESTURE VISUAL HUD OVERLAY -->
           <div id="hudOverlay" class="absolute inset-0 pointer-events-none z-40 flex items-center justify-center opacity-0 transition-opacity duration-200">
@@ -723,6 +833,11 @@
     let isDraggingGesture = false;
     let initialGestureValue = 0;
     let gestureZone = null; // 'left', 'right', or 'center'
+    let lastTapTime = 0;
+    let lastTapX = 0;
+    let tapTimer = null;
+    const DOUBLE_TAP_DELAY = 280;
+    const SEEK_SECONDS = 10;
 
     let subStyle = {
       fontSize: '22px',
@@ -1231,13 +1346,6 @@
       const rect = videoContainer.getBoundingClientRect();
       const relativeX = x - rect.left;
       const width = rect.width;
-      let lastTapTime = 0;
-      let lastTapX = 0;
-      let tapTimer = null;
-
-      const DOUBLE_TAP_DELAY = 280;
-      const SEEK_SECONDS = 10;
-
       touchStartX = x;
       touchStartY = y;
       isDraggingGesture = false;
@@ -2081,6 +2189,176 @@
         joinRoom(roomParam);
       }
     });
+
+    /* ==========================================================================
+       CINESYNC PRO: ACCESSIBILITY, KEYBOARD PARITY, LOCAL TRACKS & SYNC HOOKS
+       ========================================================================== */
+    const brightnessOverlay = document.getElementById('brightnessOverlay');
+    const reactionTray = document.getElementById('reactionTray');
+    const reactionTrayToggle = document.getElementById('reactionTrayToggle');
+    const reactionTrayClose = document.getElementById('reactionTrayClose');
+
+    // Explicit integration hooks: only playback state is broadcast to the room.
+    function onGlobalPlay() {
+      if (!isRemoteCommand) emitPlaybackAction('PLAY');
+    }
+    function onGlobalPause() {
+      if (!isRemoteCommand) emitPlaybackAction('PAUSE');
+    }
+    function onGlobalSeek(targetTimeStamp) {
+      if (!isRemoteCommand) emitPlaybackAction('SEEK', { currentTime: targetTimeStamp });
+    }
+    // These local callbacks intentionally never broadcast.
+    function onLocalVolumeChange(value) { setLocalVolume(value); }
+    function onLocalBrightnessChange(value) { setLocalBrightness(value); }
+    function onLocalTrackToggle() { /* client-local track state only */ }
+
+    // Black overlay handles dimming on mobile; filter handles the >100% range.
+    const originalSetLocalBrightness = setLocalBrightness;
+    setLocalBrightness = function(value) {
+      originalSetLocalBrightness(value);
+      if (brightnessOverlay) {
+        brightnessOverlay.style.opacity = String(Math.max(0, 1 - localBrightness));
+        videoPlayer.style.filter = localBrightness > 1 ? `brightness(${localBrightness})` : 'none';
+      }
+      if (typeof onLocalBrightnessChange === 'function') {
+        // State update is local; this callback must not emit network traffic.
+      }
+    };
+
+    // Replace gesture callbacks with explicit local-only wrappers where invoked.
+    const originalSetLocalVolume = setLocalVolume;
+    setLocalVolume = function(value) {
+      originalSetLocalVolume(value);
+      if (typeof onLocalVolumeChange === 'function') {
+        // State update is local; this callback must not emit network traffic.
+      }
+    };
+
+    function toggleReactionTray(force) {
+      const open = typeof force === 'boolean' ? force : !reactionTray.classList.contains('open');
+      reactionTray.classList.toggle('open', open);
+      reactionTray.setAttribute('aria-hidden', String(!open));
+      reactionTrayToggle.setAttribute('aria-expanded', String(open));
+    }
+    reactionTrayToggle.addEventListener('click', () => toggleReactionTray());
+    reactionTrayClose.addEventListener('click', () => toggleReactionTray(false));
+    reactionTray.addEventListener('click', event => {
+      const button = event.target.closest('.reaction-trigger');
+      if (button?.dataset.emoji) {
+        triggerFloatingEmoji(button.dataset.emoji);
+        const payload = { type: 'EMOJI_REACTION', emoji: button.dataset.emoji };
+        if (isHost) broadcastData(payload);
+        else if (activeConnections[0]?.open) activeConnections[0].send(payload);
+      }
+    });
+
+    // Delegate reaction clicks from both the existing bar and the slide-over tray.
+    document.querySelectorAll('#fullscreenReactions .reaction-trigger').forEach(button => {
+      button.addEventListener('click', () => {
+        const emoji = button.dataset.emoji;
+        if (!emoji) return;
+        const payload = { type: 'EMOJI_REACTION', emoji };
+        if (isHost) broadcastData(payload);
+        else if (activeConnections[0]?.open) activeConnections[0].send(payload);
+      });
+    });
+
+    // Smoothly animate reactions using transform/opacity only.
+    triggerFloatingEmoji = function(emoji) {
+      const layer = document.getElementById('reactionLayer');
+      if (!layer) return;
+      const el = document.createElement('span');
+      el.className = 'floating-reaction';
+      el.textContent = emoji;
+      el.style.setProperty('--x', `${8 + Math.random() * 78}%`);
+      el.style.setProperty('--drift', `${Math.round(Math.random() * 90 - 45)}px`);
+      layer.appendChild(el);
+      el.addEventListener('animationend', () => el.remove(), { once: true });
+    };
+
+    // Keyboard shortcuts are disabled while typing into form controls.
+    document.addEventListener('keydown', event => {
+      const target = event.target;
+      const typing = target instanceof HTMLElement &&
+        (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
+      if (typing || event.altKey || event.ctrlKey || event.metaKey) return;
+      if (!roomScreen || roomScreen.classList.contains('hidden')) return;
+
+      const key = event.key.toLowerCase();
+      if (key === ' ' || key === 'arrowleft' || key === 'arrowright' ||
+          key === 'arrowup' || key === 'arrowdown') event.preventDefault();
+
+      if (key === ' ' ) {
+        if (videoPlayer.paused) { videoPlayer.play().catch(() => {}); onGlobalPlay(); }
+        else { videoPlayer.pause(); onGlobalPause(); }
+      } else if (key === 'arrowright' || key === 'arrowleft') {
+        const direction = key === 'arrowright' ? 1 : -1;
+        const duration = Number.isFinite(videoPlayer.duration) ? videoPlayer.duration : Infinity;
+        const targetTime = Math.max(0, Math.min(duration, videoPlayer.currentTime + direction * 10));
+        videoPlayer.currentTime = targetTime;
+        onGlobalSeek(targetTime);
+        showVLCVisualHUD(direction > 0 ? 'fa-forward' : 'fa-backward', `${direction > 0 ? '+' : '-'}10 seconds`, 100);
+      } else if (key === 'arrowup' || key === 'arrowdown') {
+        const direction = key === 'arrowup' ? 1 : -1;
+        onLocalVolumeChange(videoPlayer.volume + direction * 0.05);
+      } else if (key === 'f') {
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+        else videoContainer.requestFullscreen?.().catch(() => showToast('Fullscreen unavailable.', 'info'));
+      } else if (key === 'm') {
+        videoPlayer.muted = !videoPlayer.muted;
+        muteBtn.innerHTML = videoPlayer.muted
+          ? '<i class="fa-solid fa-volume-xmark"></i>'
+          : '<i class="fa-solid fa-volume-high"></i>';
+        showVLCVisualHUD(videoPlayer.muted ? 'fa-volume-xmark' : 'fa-volume-high',
+          videoPlayer.muted ? 'Muted' : `Volume ${Math.round(videoPlayer.volume * 100)}%`,
+          videoPlayer.muted ? 0 : videoPlayer.volume * 100);
+      } else if (key === 'escape') {
+        toggleReactionTray(false);
+      }
+    }, { passive: false });
+
+    // Keep local track selections isolated; expose native track APIs where supported.
+    function refreshNativeVideoTracks() {
+      const tracks = videoPlayer.videoTracks;
+      if (!tracks || !tracks.length) return;
+      let select = document.getElementById('videoTrackSelect');
+      if (!select) {
+        select = document.createElement('select');
+        select.id = 'videoTrackSelect';
+        select.className = 'bg-slate-900/90 border border-slate-700 text-slate-200 text-[10px] sm:text-xs rounded-lg px-1.5 py-1 outline-none max-w-[120px]';
+        select.setAttribute('aria-label', 'Video track');
+        speedSelect.parentElement.insertBefore(select, speedSelect);
+      }
+      select.replaceChildren();
+      Array.from(tracks).forEach((track, index) => {
+        const option = document.createElement('option');
+        option.value = String(index);
+        option.textContent = track.label || `Video ${index + 1}`;
+        option.selected = !!track.selected;
+        select.appendChild(option);
+      });
+      select.onchange = () => {
+        Array.from(tracks).forEach((track, index) => { track.selected = index === Number(select.value); });
+        onLocalTrackToggle();
+      };
+    }
+    videoPlayer.addEventListener('loadedmetadata', refreshNativeVideoTracks);
+    videoPlayer.addEventListener('play', refreshNativeVideoTracks);
+
+    // WebVTT tracks and audioTracks are browser/codec-dependent. MKV support also
+    // depends on the browser's demuxer; unsupported files require transcoding or
+    // a compatible browser codec and cannot be enabled by frontend code alone.
+    audioTrackSelect.addEventListener('change', onLocalTrackToggle);
+    subTrackSelect.addEventListener('change', onLocalTrackToggle);
+    volumeSlider.addEventListener('input', () => onLocalVolumeChange(Number(volumeSlider.value)));
+
+    // Keep pinch/selection browser behavior out of the actual player surface.
+    videoContainer.addEventListener('contextmenu', event => event.preventDefault());
+    document.addEventListener('gesturestart', event => {
+      if (videoContainer.contains(event.target)) event.preventDefault();
+    }, { passive: false });
+
   </script>
 </body>
 </html>
