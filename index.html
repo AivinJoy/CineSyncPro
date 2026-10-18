@@ -99,20 +99,56 @@
       #roomScreen {
         width: 100%;
         min-width: 0;
+        min-height: 0;
+        height: auto;
+        overflow: visible;
       }
     
-      #videoContainer {
+      /* Give the upload screen enough room for its buttons. */
+      #videoContainer:not(.has-video) {
+        width: 100%;
+        aspect-ratio: auto;
+        height: auto;
+        min-height: min(58dvh, 440px);
+        flex: 0 0 auto;
+      }
+    
+      /* Once a movie is loaded, use a normal 16:9 player. */
+      #videoContainer.has-video {
         width: 100%;
         aspect-ratio: 16 / 9;
+        height: auto;
         min-height: 0;
-        flex-shrink: 0;
+        flex: 0 0 auto;
       }
     
       #videoPlayer {
+        display: block;
         width: 100%;
         height: 100%;
-        max-height: 100%;
+        max-height: none;
         object-fit: contain;
+      }
+    
+      #noVideoOverlay {
+        padding: 12px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+    
+      #dropZone {
+        width: 100%;
+        max-width: 100%;
+        padding: 14px;
+        gap: 12px;
+      }
+    
+      #dropZone h3 {
+        font-size: 15px;
+      }
+    
+      #dropZone p {
+        font-size: 11px;
       }
     
       #videoControls {
@@ -374,9 +410,36 @@
               </div>
             </div>
           </div>
+          <div id="fullscreenReactions" class="absolute top-3 left-1/2 -translate-x-1/2 z-50
+            flex items-center gap-1 bg-slate-950/90
+            border border-slate-800 rounded-2xl p-1
+            overflow-x-auto max-w-[95%] pointer-events-auto">
+            <!-- FLOATING EMOJI REACTIONS TOOLBAR -->
+            <div class="flex items-center gap-1 bg-slate-950/90 border border-slate-800 rounded-2xl p-1 overflow-x-auto max-w-full">
+              <div class="flex items-center gap-1 shrink-0 pr-1 border-r border-slate-800 text-[10px] text-slate-400 font-bold uppercase">
+                <span class="hidden md:inline px-1">Reactions:</span>
+              </div>
+              <button class="reaction-trigger p-1.5 hover:bg-slate-800 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🍿" title="Popcorn">🍿</button>
+              <button class="reaction-trigger p-1.5 hover:bg-slate-800 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🤣" title="Lol">🤣</button>
+              <button class="reaction-trigger p-1.5 hover:bg-slate-800 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="😱" title="Shocked">😱</button>
+              <button class="reaction-trigger p-1.5 hover:bg-slate-800 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🔥" title="Fire">🔥</button>
+              <span class="text-[9px] text-pink-400/70 font-mono px-1 shrink-0 font-bold border-l border-slate-800">ROMANCE</span>
+              <button class="reaction-trigger p-1.5 hover:bg-pink-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="💖" title="Sparkling Heart">💖</button>
+              <button class="reaction-trigger p-1.5 hover:bg-pink-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🥺" title="Pleading Eyes">🥺</button>
+              <button class="reaction-trigger p-1.5 hover:bg-pink-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🫣" title="Peeking">🫣</button>
+              <button class="reaction-trigger p-1.5 hover:bg-pink-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="💋" title="Kiss">💋</button>
+              <button class="reaction-trigger p-1.5 hover:bg-pink-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🥰" title="Smitten">🥰</button>
+              <span class="text-[9px] text-amber-400/70 font-mono px-1 shrink-0 font-bold border-l border-slate-800">CRINGE</span>
+              <button class="reaction-trigger p-1.5 hover:bg-amber-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="😬" title="Grimace">😬</button>
+              <button class="reaction-trigger p-1.5 hover:bg-amber-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🤦" title="Facepalm">🤦</button>
+              <button class="reaction-trigger p-1.5 hover:bg-amber-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🤮" title="Disgust">🤮</button>
+              <button class="reaction-trigger p-1.5 hover:bg-amber-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="💀" title="Dead">💀</button>
+              <button class="reaction-trigger p-1.5 hover:bg-amber-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🤡" title="Clown">🤡</button>
+            </div>
+          </div>  
 
           <!-- CUSTOM VIDEO CONTROLS OVERLAY -->
-          <div id="videoControls" class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/80 to-transparent p-3 sm:p-4 opacity-100 transition-opacity duration-300 z-30">
+          <div id="videoControls" class="hidden absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/80 to-transparent p-3 sm:p-4 opacity-100 transition-opacity duration-300 z-30">
             
             <!-- Progress Bar Container -->
             <div id="seekBarContainer" class="relative w-full flex items-center mb-3 group/seek cursor-pointer py-1">
@@ -475,31 +538,6 @@
             </button>
           </div>
 
-          <!-- FLOATING EMOJI REACTIONS TOOLBAR -->
-          <div class="flex items-center gap-1 bg-slate-950/90 border border-slate-800 rounded-2xl p-1 overflow-x-auto max-w-full">
-            <div class="flex items-center gap-1 shrink-0 pr-1 border-r border-slate-800 text-[10px] text-slate-400 font-bold uppercase">
-              <span class="hidden md:inline px-1">Reactions:</span>
-            </div>
-            
-            <button class="reaction-trigger p-1.5 hover:bg-slate-800 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🍿" title="Popcorn">🍿</button>
-            <button class="reaction-trigger p-1.5 hover:bg-slate-800 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🤣" title="Lol">🤣</button>
-            <button class="reaction-trigger p-1.5 hover:bg-slate-800 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="😱" title="Shocked">😱</button>
-            <button class="reaction-trigger p-1.5 hover:bg-slate-800 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🔥" title="Fire">🔥</button>
-
-            <span class="text-[9px] text-pink-400/70 font-mono px-1 shrink-0 font-bold border-l border-slate-800">ROMANCE</span>
-            <button class="reaction-trigger p-1.5 hover:bg-pink-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="💖" title="Sparkling Heart">💖</button>
-            <button class="reaction-trigger p-1.5 hover:bg-pink-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🥺" title="Pleading Eyes">🥺</button>
-            <button class="reaction-trigger p-1.5 hover:bg-pink-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🫣" title="Peeking">🫣</button>
-            <button class="reaction-trigger p-1.5 hover:bg-pink-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="💋" title="Kiss">💋</button>
-            <button class="reaction-trigger p-1.5 hover:bg-pink-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🥰" title="Smitten">🥰</button>
-
-            <span class="text-[9px] text-amber-400/70 font-mono px-1 shrink-0 font-bold border-l border-slate-800">CRINGE</span>
-            <button class="reaction-trigger p-1.5 hover:bg-amber-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="😬" title="Grimace">😬</button>
-            <button class="reaction-trigger p-1.5 hover:bg-amber-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🤦" title="Facepalm">🤦</button>
-            <button class="reaction-trigger p-1.5 hover:bg-amber-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🤮" title="Disgust">🤮</button>
-            <button class="reaction-trigger p-1.5 hover:bg-amber-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="💀" title="Dead">💀</button>
-            <button class="reaction-trigger p-1.5 hover:bg-amber-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🤡" title="Clown">🤡</button>
-          </div>
 
         </div>
 
@@ -1120,37 +1158,85 @@
       showVLCVisualHUD(vol === 0 ? 'fa-volume-xmark' : 'fa-volume-high', `Volume ${displayPercent}%`, displayPercent);
     }
 
+    
+    function showPlaybackControls() {
+      if (!videoContainer.classList.contains('has-video')) return;
+    
+      clearTimeout(controlsTimeout);
+    
+      videoControls.classList.remove(
+        'hidden',
+        'opacity-0',
+        'pointer-events-none'
+      );
+    
+      autoHideControlsTimer();
+    }
+
+    function hidePlaybackControls() {
+      clearTimeout(controlsTimeout);
+    
+      if (videoPlayer.paused) return;
+    
+      videoControls.classList.add(
+        'opacity-0',
+        'pointer-events-none'
+      );
+    }
+
     function togglePlaybackControls() {
       if (videoControls.classList.contains('opacity-0')) {
-        videoControls.classList.remove('opacity-0');
-        autoHideControlsTimer();
+        showPlaybackControls();
       } else {
-        videoControls.classList.add('opacity-0');
+        hidePlaybackControls();
       }
     }
 
     function autoHideControlsTimer() {
       clearTimeout(controlsTimeout);
-        
-      // Keep controls visible while paused or while the user
-      // is actively interacting with them.
-      if (videoPlayer.paused || isInteractingWithControls) {
+    
+      if (
+        !videoContainer.classList.contains('has-video') ||
+        videoPlayer.paused
+      ) {
         return;
       }
     
       controlsTimeout = setTimeout(() => {
-        if (!videoPlayer.paused && !isInteractingWithControls) {
-          videoControls.classList.add('opacity-0');
-          videoControls.classList.add('pointer-events-none');
-        }
+        hidePlaybackControls();
       }, 2500);
     }
+
+    videoPlayer.addEventListener('play', () => {
+      autoHideControlsTimer();
+    });
+
+    videoPlayer.addEventListener('pause', () => {
+      clearTimeout(controlsTimeout);
+      if (videoContainer.classList.contains('has-video')) {
+        videoControls.classList.remove(
+          'opacity-0',
+          'pointer-events-none'
+        );
+      }
+    });
+
+    videoContainer.addEventListener('mousemove', () => {
+      showPlaybackControls();
+    });
+
 
     // Gesture Listeners for Video Container
     function handleGestureStart(x, y) {
       const rect = videoContainer.getBoundingClientRect();
       const relativeX = x - rect.left;
       const width = rect.width;
+      let lastTapTime = 0;
+      let lastTapX = 0;
+      let tapTimer = null;
+
+      const DOUBLE_TAP_DELAY = 280;
+      const SEEK_SECONDS = 10;
 
       touchStartX = x;
       touchStartY = y;
@@ -1188,18 +1274,72 @@
       }
     }
 
+    
     function handleGestureEnd() {
-      if (!isDraggingGesture) {
-        // Simple Tap Detected
-        if (gestureZone === 'center') {
-          togglePlaybackControls();
-        } else {
-          togglePlaybackControls();
-        }
-      }
+      if (!gestureZone) return;
+    
+      const zone = gestureZone;
+      const x = touchStartX;
+      const wasDragging = isDraggingGesture;
+    
       isDraggingGesture = false;
       gestureZone = null;
+    
+      // Keep the existing swipe gestures for brightness and volume.
+      if (wasDragging) return;
+    
+      const now = Date.now();
+    
+      const isDoubleTap =
+        now - lastTapTime <= DOUBLE_TAP_DELAY &&
+        Math.abs(x - lastTapX) < 80;
+    
+      if (isDoubleTap && zone !== 'center') {
+        clearTimeout(tapTimer);
+        tapTimer = null;
+        lastTapTime = 0;
+      
+        const direction = zone === 'left' ? -1 : 1;
+        const duration = Number.isFinite(videoPlayer.duration)
+          ? videoPlayer.duration
+          : Infinity;
+      
+        const targetTime = Math.max(
+          0,
+          Math.min(
+            duration,
+            videoPlayer.currentTime + direction * SEEK_SECONDS
+          )
+        );
+      
+        videoPlayer.currentTime = targetTime;
+      
+        emitPlaybackAction('SEEK', {
+          currentTime: targetTime
+        });
+      
+        showVLCVisualHUD(
+          direction < 0 ? 'fa-rotate-left' : 'fa-rotate-right',
+          `${direction < 0 ? '-' : '+'}10 seconds`,
+          100
+        );
+      
+        showPlaybackControls();
+        return;
+      }
+    
+      lastTapTime = now;
+      lastTapX = x;
+    
+      clearTimeout(tapTimer);
+    
+      tapTimer = setTimeout(() => {
+        togglePlaybackControls();
+        lastTapTime = 0;
+        tapTimer = null;
+      }, DOUBLE_TAP_DELAY);
     }
+
 
     // Mouse & Touch Event Handlers
     videoContainer.addEventListener('touchstart', (e) => {
@@ -1439,6 +1579,8 @@
 
       videoObjectUrl = URL.createObjectURL(file);
       videoPlayer.src = videoObjectUrl;
+      videoControls.classList.remove('hidden');
+      videoControls.classList.remove('opacity-0', 'pointer-events-none');
       noVideoOverlay.classList.add('hidden');
       unloadVideoBtn.classList.remove('hidden');
 
@@ -1457,6 +1599,7 @@
         videoObjectUrl = null;
       }
 
+
       noVideoOverlay.classList.remove('hidden');
       unloadVideoBtn.classList.add('hidden');
 
@@ -1464,6 +1607,12 @@
       subTrackSelect.innerHTML = '<option value="off">Subtitles: OFF</option>';
       subtitleOverlay.classList.add('hidden');
       subDelayControls.classList.add('hidden');
+
+      videoContainer.classList.remove('has-video');
+
+      videoControls.classList.add('hidden');
+      videoControls.classList.remove('opacity-0', 'pointer-events-none');
+      clearTimeout(controlsTimeout);
 
       seekBar.value = 0;
       seekBarFill.style.width = '0%';
@@ -1597,14 +1746,36 @@
       else setLocalVolume(0);
     });
 
-    fullscreenBtn.addEventListener('click', () => {
-      const container = document.getElementById('videoContainer');
-      if (!document.fullscreenElement) {
-        container.requestFullscreen().catch(() => {});
-      } else {
-        document.exitFullscreen();
+    
+    fullscreenBtn.addEventListener('click', async () => {
+      try {
+        if (!document.fullscreenElement) {
+          await videoContainer.requestFullscreen();
+        
+          try {
+            if (screen.orientation?.lock) {
+              await screen.orientation.lock('landscape');
+            }
+          } catch {
+            // Some Android browsers do not allow orientation locking.
+          }
+        } else {
+          await document.exitFullscreen();
+        }
+      } catch (error) {
+        showToast(
+          'Fullscreen is unavailable in this browser.',
+          'info'
+        );
       }
     });
+    
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement) {
+        screen.orientation?.unlock?.();
+      }
+    });
+
 
     // Subtitle Delay Offset Controls
     document.getElementById('subDelayMinusBtn').addEventListener('click', () => {
