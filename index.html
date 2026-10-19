@@ -2,7 +2,7 @@
 <html lang="en" class="dark h-full">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>CineSync Pro - Real-Time Watch Party</title>
 
   <!-- Tailwind CSS -->
@@ -223,7 +223,7 @@
 
     #videoContainer {
       overscroll-behavior: contain;
-      touch-action: pan-x pan-y;
+      touch-action: pan-y;
       -webkit-tap-highlight-color: transparent;
       isolation: isolate;
       contain: layout paint;
@@ -281,17 +281,17 @@
     .reaction-pack button { font-size:22px; padding:5px 8px; border-radius:10px; background:rgba(30,41,59,.8); }
     .reaction-pack button:active { transform:scale(.92); }
     .floating-reaction {
-      position:absolute; bottom:8%; left:var(--x); font-size:clamp(28px,5vw,48px);
+      position:absolute; bottom:var(--y, 8%); left:var(--x); font-size:clamp(28px,5vw,48px);
       will-change:transform, opacity; animation: reaction-rise 2.2s cubic-bezier(.2,.7,.2,1) forwards;
       filter:drop-shadow(0 3px 8px rgba(0,0,0,.45));
     }
     @keyframes reaction-rise {
       0% { transform:translate3d(0,0,0) scale(.75) rotate(-8deg); opacity:0; }
       12% { opacity:1; }
-      100% { transform:translate3d(var(--drift),-75vh,0) scale(1.18) rotate(12deg); opacity:0; }
+      100% { transform:translate3d(var(--drift),-70%,0) scale(1.18) rotate(12deg); opacity:0; }
     }
     @media (max-width:639px) {
-      #videoContainer { touch-action: none; }
+      #videoContainer { touch-action: pan-y; }
       #videoContainer:fullscreen #videoControls { gap:8px; }
       #videoContainer:fullscreen #videoControls > div:last-child { flex-wrap:wrap; justify-content:flex-end; }
       #videoContainer:fullscreen #videoControls select { max-width: min(27vw,120px); }
@@ -301,6 +301,115 @@
       .reaction-tray { transition:none; }
     }
 
+
+    /* Responsive page flow: scrolling belongs to the document on small screens. */
+    html, body { height: auto; min-height: 100%; overflow-x: clip; overflow-y: auto; }
+    body { min-height: 100dvh; }
+    #roomScreen { height: auto; min-height: 0; overflow: visible; }
+    #videoContainer { flex: 0 0 auto; width: 100%; aspect-ratio: 16 / 9; contain: layout paint; }
+    #videoContainer.has-video { aspect-ratio: 16 / 9; }
+    #videoPlayer { width: 100%; height: 100%; max-height: none; object-fit: contain; }
+    #reactionTrayToggle { top: auto; bottom: max(14px, env(safe-area-inset-bottom)); right: max(14px, env(safe-area-inset-right)); border: 0; background: transparent; box-shadow: none; backdrop-filter: none; width: 44px; height: 44px; font-size: 20px; }
+    #reactionTray { top: auto; bottom: max(68px, calc(env(safe-area-inset-bottom) + 58px)); right: max(12px, env(safe-area-inset-right)); max-height: min(70%, 520px); }
+    #reactionTrayToggle:focus-visible, #reactionTray button:focus-visible { outline: 2px solid #a5b4fc; outline-offset: 3px; }
+    #reactionTray[aria-hidden="true"] { visibility: hidden; }
+    #reactionTray.open { visibility: visible; }
+    #videoContainer:fullscreen #reactionTrayToggle,
+    #videoContainer:fullscreen #reactionTray,
+    #videoContainer:fullscreen #fullscreenReactions { display: none; }
+    #videoContainer:fullscreen.controls-visible #reactionTrayToggle { display: flex; }
+    #videoContainer:fullscreen.controls-visible #reactionTray.open { display: block; }
+    #videoContainer:fullscreen.controls-visible #reactionTray { display: block; }
+    #videoContainer:fullscreen:not(.controls-visible) #reactionTrayToggle,
+    #videoContainer:fullscreen:not(.controls-visible) #reactionTray { opacity: 0; visibility: hidden; pointer-events: none; }
+    @media (min-width: 1024px) {
+      #roomScreen { display: flex; flex-direction: row; align-items: flex-start; }
+      #videoContainer { flex: 1 1 auto; min-width: 0; }
+    }
+    @media (max-width: 1023px) {
+      #roomScreen { flex-direction: column; }
+      #videoContainer { min-height: 0; }
+      #videoControls > div:last-child { flex-wrap: wrap; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .reaction-tray { transition-duration: 0.01ms; }
+      .floating-reaction { animation-duration: 0.01ms; }
+    }
+
+
+    /* Player interaction fixes */
+    #videoContainer { position: relative; overflow: hidden; }
+    #videoControls { z-index: 45; }
+    #seekBarContainer { touch-action: pan-x; }
+    #seekBar {
+      display: block; opacity: 1 !important; appearance: none; -webkit-appearance: none;
+      height: 18px; margin: 0; background: transparent; cursor: pointer;
+      touch-action: pan-x; pointer-events: auto;
+    }
+    #seekBar::-webkit-slider-runnable-track { height: 5px; border-radius: 999px; background: rgba(148,163,184,.35); }
+    #seekBar::-moz-range-track { height: 5px; border-radius: 999px; background: rgba(148,163,184,.35); }
+    #seekBar::-webkit-slider-thumb { -webkit-appearance:none; width:13px; height:13px; margin-top:-4px; border-radius:50%; background:#fff; border:2px solid #a855f7; box-shadow:0 0 8px rgba(168,85,247,.7); }
+    #seekBar::-moz-range-thumb { width:11px; height:11px; border-radius:50%; background:#fff; border:2px solid #a855f7; }
+    #volumeSlider { appearance:none; -webkit-appearance:none; accent-color:#818cf8; cursor:pointer; touch-action:pan-x; min-width:72px; height:14px; border-radius:999px; background:linear-gradient(to right,#818cf8 0%,#6366f1 var(--volume-percent,100%),#334155 var(--volume-percent,100%),#334155 100%); outline:none; }
+    #volumeSlider::-webkit-slider-runnable-track { height:4px; border-radius:999px; background:transparent; }
+    #volumeSlider::-moz-range-track { height:4px; border-radius:999px; background:transparent; }
+    #volumeSlider::-webkit-slider-thumb { -webkit-appearance:none; width:12px; height:12px; margin-top:-4px; border-radius:50%; background:#fff; border:2px solid #818cf8; box-shadow:0 0 0 3px rgba(129,140,248,.18); }
+    #volumeSlider::-moz-range-thumb { width:12px; height:12px; border-radius:50%; background:#fff; border:2px solid #818cf8; box-shadow:0 0 0 3px rgba(129,140,248,.18); }
+    .reaction-tray-toggle {
+      z-index: 46; top:auto !important; bottom:84px !important; right:16px !important;
+      width:40px !important; height:40px !important; border:1px solid rgba(255,255,255,.2) !important;
+      border-radius:50% !important; background:rgba(2,6,23,.85) !important;
+      box-shadow:0 4px 18px rgba(0,0,0,.35) !important; backdrop-filter:blur(12px) !important;
+    }
+    .reaction-tray {
+      z-index:47; top:auto !important; bottom:132px !important; right:12px !important;
+      max-height:min(65%,480px);
+    }
+    #videoContainer:not(.has-video) #reactionTrayToggle,
+    #videoContainer:not(.has-video) #reactionTray { display:none; }
+    #videoContainer:fullscreen .reaction-tray-toggle { bottom:100px !important; }
+    #videoContainer:fullscreen .reaction-tray { bottom:148px !important; }
+
+    /* Mobile VLC-style overlay: controls fade away, top actions follow the same state. */
+    #videoControls { transition: opacity 220ms ease, transform 220ms ease; }
+    #videoControls.opacity-0 { opacity: 0; transform: translateY(8px); }
+    .mobile-player-leave {
+      display: none; position: absolute; z-index: 60; top: max(12px, env(safe-area-inset-top));
+      left: max(12px, env(safe-area-inset-left)); align-items: center; gap: 7px;
+      min-height: 38px; padding: 0 12px; border-radius: 999px;
+      color: #fff; font-size: 12px; font-weight: 700;
+      border: 1px solid rgba(255,255,255,.22); background: rgba(2,6,23,.78);
+      backdrop-filter: blur(12px); box-shadow: 0 4px 16px rgba(0,0,0,.25);
+      opacity: 0; visibility: hidden; pointer-events: none;
+      transition: opacity 220ms ease, visibility 220ms ease;
+    }
+    #videoContainer.has-video.controls-visible .mobile-player-leave {
+      opacity: 1; visibility: visible; pointer-events: auto;
+    }
+    #videoContainer:fullscreen .mobile-player-leave {
+      display: inline-flex; top: max(14px, env(safe-area-inset-top));
+      left: max(14px, env(safe-area-inset-left));
+    }
+    #videoContainer:fullscreen:not(.controls-visible) .mobile-player-leave {
+      opacity: 0; visibility: hidden; pointer-events: none;
+    }
+    @media (max-width: 767px) {
+      .mobile-player-leave { display: inline-flex; }
+      #videoContainer:fullscreen #videoControls {
+        padding-bottom: max(18px, env(safe-area-inset-bottom));
+      }
+      #videoContainer:fullscreen #seekBarContainer { margin-bottom: 10px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #videoControls, .mobile-player-leave { transition-duration: 0.01ms; }
+    }
+
+    @media (min-width:768px) {
+      #videoContainer { position:relative; align-self:flex-start; }
+      #roomScreen { position:relative; }
+      #videoPlayer { position:relative; }
+      #seekBar { opacity:1 !important; }
+    }
   </style>
 </head>
 
@@ -365,7 +474,7 @@
   <main class="flex-1 flex flex-col relative w-full min-h-0">
 
     <!-- LANDING HERO SCREEN -->
-    <div id="landingScreen" class="w-full flex-1 flex flex-col items-center justify-center p-4 sm:p-8 relative min-h-[calc(100vh-65px)]">
+    <div id="landingScreen" class="w-full flex-1 flex flex-col items-center justify-center p-4 sm:p-8 relative min-h-[calc(100dvh-65px)]">
       <div class="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] sm:w-[600px] h-[300px] sm:h-[600px] bg-indigo-600/10 rounded-full blur-[100px] sm:blur-[140px] pointer-events-none"></div>
 
       <div class="max-w-4xl w-full mx-auto text-center space-y-6 sm:space-y-8 z-10 my-auto py-6">
@@ -441,13 +550,13 @@
     </div>
 
     <!-- THEATER WATCH ROOM SCREEN -->
-    <div id="roomScreen" class="hidden w-full flex-1 flex flex-col lg:flex-row min-h-0 lg:h-[calc(100dvh-65px)] overflow-y-auto lg:overflow-hidden">
+    <div id="roomScreen" class="hidden w-full flex-1 flex flex-col lg:flex-row min-h-0 overflow-visible">
       
       <!-- MAIN THEATER STAGE -->
-      <div class="flex-1 flex flex-col bg-black relative min-h-0 no-select">
+      <div class="flex-1 min-w-0 flex flex-col bg-black relative min-h-0 no-select">
         
         <!-- Video Container -->
-        <div id="videoContainer" class="relative w-full aspect-video sm:aspect-auto sm:flex-1 bg-slate-950 flex items-center justify-center min-h-0 sm:min-h-[380px] overflow-hidden group touch-none select-none">
+        <div id="videoContainer" class="relative w-full aspect-video bg-slate-950 flex items-center justify-center min-h-0 overflow-hidden group select-none">
           
           <!-- Native HTML5 Video Element -->
           <video id="videoPlayer" class="w-full h-full object-contain max-h-[80vh] transition-[filter] duration-75" preload="metadata" crossorigin="anonymous" playsinline>
@@ -456,6 +565,12 @@
 
           <!-- Local dimming layer; all fullscreen UI stays inside #videoContainer. -->
           <div id="brightnessOverlay" aria-hidden="true"></div>
+
+          <!-- Mobile watch-party exit remains available while the player is fullscreen. -->
+          <button id="mobileLeaveRoomBtn" type="button" aria-label="Leave watch party" title="Leave watch party"
+            class="mobile-player-leave">
+            <i class="fa-solid fa-arrow-left"></i><span>Leave</span>
+          </button>
 
           <!-- Fullscreen-safe quick reaction drawer -->
           <button id="reactionTrayToggle" type="button" aria-label="Open reactions" aria-expanded="false"
@@ -532,34 +647,6 @@
               </div>
             </div>
           </div>
-          <div id="fullscreenReactions" class="absolute top-3 left-1/2 -translate-x-1/2 z-50
-            flex items-center gap-1 bg-slate-950/90
-            border border-slate-800 rounded-2xl p-1
-            overflow-x-auto max-w-[95%] pointer-events-auto">
-            <!-- FLOATING EMOJI REACTIONS TOOLBAR -->
-            <div class="flex items-center gap-1 bg-slate-950/90 border border-slate-800 rounded-2xl p-1 overflow-x-auto max-w-full">
-              <div class="flex items-center gap-1 shrink-0 pr-1 border-r border-slate-800 text-[10px] text-slate-400 font-bold uppercase">
-                <span class="hidden md:inline px-1">Reactions:</span>
-              </div>
-              <button class="reaction-trigger p-1.5 hover:bg-slate-800 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🍿" title="Popcorn">🍿</button>
-              <button class="reaction-trigger p-1.5 hover:bg-slate-800 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🤣" title="Lol">🤣</button>
-              <button class="reaction-trigger p-1.5 hover:bg-slate-800 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="😱" title="Shocked">😱</button>
-              <button class="reaction-trigger p-1.5 hover:bg-slate-800 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🔥" title="Fire">🔥</button>
-              <span class="text-[9px] text-pink-400/70 font-mono px-1 shrink-0 font-bold border-l border-slate-800">ROMANCE</span>
-              <button class="reaction-trigger p-1.5 hover:bg-pink-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="💖" title="Sparkling Heart">💖</button>
-              <button class="reaction-trigger p-1.5 hover:bg-pink-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🥺" title="Pleading Eyes">🥺</button>
-              <button class="reaction-trigger p-1.5 hover:bg-pink-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🫣" title="Peeking">🫣</button>
-              <button class="reaction-trigger p-1.5 hover:bg-pink-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="💋" title="Kiss">💋</button>
-              <button class="reaction-trigger p-1.5 hover:bg-pink-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🥰" title="Smitten">🥰</button>
-              <span class="text-[9px] text-amber-400/70 font-mono px-1 shrink-0 font-bold border-l border-slate-800">CRINGE</span>
-              <button class="reaction-trigger p-1.5 hover:bg-amber-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="😬" title="Grimace">😬</button>
-              <button class="reaction-trigger p-1.5 hover:bg-amber-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🤦" title="Facepalm">🤦</button>
-              <button class="reaction-trigger p-1.5 hover:bg-amber-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🤮" title="Disgust">🤮</button>
-              <button class="reaction-trigger p-1.5 hover:bg-amber-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="💀" title="Dead">💀</button>
-              <button class="reaction-trigger p-1.5 hover:bg-amber-950/40 rounded-xl text-base sm:text-lg hover:scale-125 transition-transform shrink-0" data-emoji="🤡" title="Clown">🤡</button>
-            </div>
-          </div>  
-
           <!-- CUSTOM VIDEO CONTROLS OVERLAY -->
           <div id="videoControls" class="hidden absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/95 via-black/80 to-transparent p-3 sm:p-4 opacity-100 transition-opacity duration-300 z-30">
             
@@ -844,9 +931,11 @@
     let touchStartX = 0;
     let isDraggingGesture = false;
     let initialGestureValue = 0;
+    let initialGestureTime = 0;
     let gestureZone = null; // 'left', 'right', or 'center'
     let lastTapTime = 0;
     let lastTapX = 0;
+    let lastTapZone = null;
     let tapTimer = null;
     const DOUBLE_TAP_DELAY = 280;
     const SEEK_SECONDS = 10;
@@ -1114,8 +1203,9 @@
           break;
 
         case 'PLAYBACK_ACTION':
-          applyRemotePlaybackAction(data);
+          // Relay immediately; keep the host's UI work off the critical path for peers.
           if (isHost) broadcastData(data, senderConn);
+          applyRemotePlaybackAction(data);
           break;
 
         case 'HOST_HEARTBEAT':
@@ -1128,7 +1218,8 @@
           break;
 
         case 'EMOJI_REACTION':
-          triggerFloatingEmoji(data.emoji);
+          if (typeof data.emoji !== 'string' || !/^.{1,8}$/u.test(data.emoji)) break;
+          triggerFloatingEmoji(data.emoji, data.x, data.y, data.drift);
           if (isHost) broadcastData(data, senderConn);
           break;
       }
@@ -1166,8 +1257,7 @@
         videoPlayer.pause();
         appendSystemChatMessage(`${data.senderName} paused video ⏸️`);
       } else if (data.action === 'SEEK') {
-        videoPlayer.currentTime = data.currentTime;
-        appendSystemChatMessage(`${data.senderName} jumped to ${formatTime(data.currentTime)} ⏩`);
+        if (Number.isFinite(data.currentTime)) videoPlayer.currentTime = data.currentTime;
       } else if (data.action === 'RATE') {
         videoPlayer.playbackRate = data.rate;
         speedSelect.value = data.rate.toString();
@@ -1245,6 +1335,7 @@
         action: action,
         senderName: myProfile.name,
         currentTime: videoPlayer.currentTime,
+        issuedAt: Date.now(),
         ...extra
       };
 
@@ -1275,10 +1366,18 @@
       showVLCVisualHUD('fa-sun', `Brightness ${displayPercent}%`, displayPercent);
     }
 
+    function updateVolumeSliderVisual(value) {
+      const percent = Math.max(0, Math.min(100, Number(value) * 100));
+      volumeSlider.style.setProperty('--volume-percent', `${percent}%`);
+      volumeSlider.style.background = `linear-gradient(to right, #818cf8 0%, #6366f1 ${percent}%, #334155 ${percent}%, #334155 100%)`;
+      volumeSlider.setAttribute('aria-valuenow', String(Math.round(percent)));
+    }
+
     function setLocalVolume(val) {
       const vol = Math.max(0, Math.min(1, val));
       videoPlayer.volume = vol;
-      volumeSlider.value = vol;
+      volumeSlider.value = String(vol);
+      updateVolumeSliderVisual(vol);
       videoPlayer.muted = (vol === 0);
       muteBtn.innerHTML = vol === 0 ? `<i class="fa-solid fa-volume-xmark"></i>` : `<i class="fa-solid fa-volume-high"></i>`;
       const displayPercent = Math.round(vol * 100);
@@ -1296,6 +1395,7 @@
         'opacity-0',
         'pointer-events-none'
       );
+      videoContainer.classList.add('controls-visible');
     
       autoHideControlsTimer();
     }
@@ -1309,6 +1409,10 @@
         'opacity-0',
         'pointer-events-none'
       );
+      videoContainer.classList.remove('controls-visible');
+      reactionTray.classList.remove('open');
+      reactionTray.setAttribute('aria-hidden', 'true');
+      reactionTrayToggle.setAttribute('aria-expanded', 'false');
     }
 
     function togglePlaybackControls() {
@@ -1335,6 +1439,7 @@
     }
 
     videoPlayer.addEventListener('play', () => {
+      videoContainer.classList.add('controls-visible');
       autoHideControlsTimer();
     });
 
@@ -1342,14 +1447,21 @@
       clearTimeout(controlsTimeout);
       if (videoContainer.classList.contains('has-video')) {
         videoControls.classList.remove(
+          'hidden',
           'opacity-0',
           'pointer-events-none'
         );
+        videoContainer.classList.add('controls-visible');
       }
     });
 
     videoContainer.addEventListener('mousemove', () => {
-      showPlaybackControls();
+      if (!mobileGestureDevice) showPlaybackControls();
+    });
+    videoContainer.addEventListener('pointerdown', (event) => {
+      if (event.pointerType === 'mouse' && !event.target.closest('#videoControls, #reactionTray, #reactionTrayToggle, #mobileLeaveRoomBtn')) {
+        showPlaybackControls();
+      }
     });
 
 
@@ -1360,6 +1472,7 @@
       const width = rect.width;
       touchStartX = x;
       touchStartY = y;
+      initialGestureTime = Number.isFinite(videoPlayer.currentTime) ? videoPlayer.currentTime : 0;
       isDraggingGesture = false;
 
       // Classify Screen Zones: Left (0-40%), Center (40-60%), Right (60-100%)
@@ -1385,8 +1498,17 @@
       if (!isDraggingGesture) return;
 
       const rect = videoContainer.getBoundingClientRect();
-      const sensitivity = deltaY / (rect.height * 0.6); // Scale gesture sensitivity
+      // VLC-style horizontal scrub: dragging left rewinds, dragging right advances.
+      if (Math.abs(deltaX) > Math.abs(deltaY) * 1.15 && Number.isFinite(videoPlayer.duration) && videoPlayer.duration > 0) {
+        gestureZone = 'seek';
+        const targetTime = Math.max(0, Math.min(videoPlayer.duration, initialGestureTime - (deltaX / Math.max(1, rect.width)) * videoPlayer.duration));
+        videoPlayer.currentTime = targetTime;
+        const offset = Math.round(targetTime - initialGestureTime);
+        showVLCVisualHUD(offset < 0 ? 'fa-backward' : 'fa-forward', `${offset > 0 ? '+' : ''}${offset}s`, Math.abs(offset) / Math.max(1, videoPlayer.duration) * 100);
+        return;
+      }
 
+      const sensitivity = deltaY / (rect.height * 0.6); // Scale gesture sensitivity
       if (gestureZone === 'left') {
         setLocalBrightness(initialGestureValue + sensitivity * 1.2);
       } else if (gestureZone === 'right') {
@@ -1405,19 +1527,27 @@
       isDraggingGesture = false;
       gestureZone = null;
     
-      // Keep the existing swipe gestures for brightness and volume.
-      if (wasDragging) return;
+      // Commit a horizontal swipe seek to the watch-party peers once, not on every move.
+      if (wasDragging) {
+        if (zone === 'seek') {
+          emitPlaybackAction('SEEK', { currentTime: videoPlayer.currentTime });
+          showPlaybackControls();
+        }
+        return;
+      }
     
       const now = Date.now();
     
       const isDoubleTap =
         now - lastTapTime <= DOUBLE_TAP_DELAY &&
-        Math.abs(x - lastTapX) < 80;
+        Math.abs(x - lastTapX) < 80 &&
+        zone === lastTapZone;
     
-      if (isDoubleTap && zone !== 'center') {
+      if (isDoubleTap && (zone === 'left' || zone === 'right')) {
         clearTimeout(tapTimer);
         tapTimer = null;
         lastTapTime = 0;
+        lastTapZone = null;
       
         const direction = zone === 'left' ? -1 : 1;
         const duration = Number.isFinite(videoPlayer.duration)
@@ -1450,55 +1580,55 @@
     
       lastTapTime = now;
       lastTapX = x;
+      lastTapZone = zone;
     
       clearTimeout(tapTimer);
     
       tapTimer = setTimeout(() => {
         togglePlaybackControls();
         lastTapTime = 0;
+        lastTapZone = null;
         tapTimer = null;
       }, DOUBLE_TAP_DELAY);
     }
 
 
+    // Desktop VLC-style double-click: left half rewinds 10s, right half advances 10s.
+    // Ignore controls so double-clicking sliders/buttons keeps their native behavior.
+    videoContainer.addEventListener('dblclick', (event) => {
+      if (event.target.closest('#videoControls, #reactionTray, #reactionTrayToggle, #mobileLeaveRoomBtn, button, input, select, a')) return;
+      if (!videoContainer.classList.contains('has-video') || !Number.isFinite(videoPlayer.duration)) return;
+      const rect = videoContainer.getBoundingClientRect();
+      const relativeX = event.clientX - rect.left;
+      const direction = relativeX < rect.width / 2 ? -1 : 1;
+      const targetTime = Math.max(0, Math.min(videoPlayer.duration, videoPlayer.currentTime + direction * SEEK_SECONDS));
+      event.preventDefault();
+      videoPlayer.currentTime = targetTime;
+      emitPlaybackAction('SEEK', { currentTime: targetTime, issuedAt: Date.now() });
+      showVLCVisualHUD(direction < 0 ? 'fa-rotate-left' : 'fa-rotate-right', `${direction < 0 ? '-' : '+'}10 seconds`, 100);
+      showPlaybackControls();
+    });
+
     // Mouse & Touch Event Handlers
+    const mobileGestureDevice = window.matchMedia('(max-width: 767px) and (pointer: coarse)').matches;
     videoContainer.addEventListener('touchstart', (e) => {
-      if (e.touches.length === 1 && e.target.closest('#videoControls') === null) {
+      if (mobileGestureDevice && e.touches.length === 1 && !e.target.closest('#videoControls, #reactionTray, #reactionTrayToggle')) {
         handleGestureStart(e.touches[0].clientX, e.touches[0].clientY);
       }
     }, { passive: true });
 
     videoContainer.addEventListener('touchmove', (e) => {
-      if (e.touches.length === 1 && gestureZone) {
+      if (mobileGestureDevice && e.touches.length === 1 && gestureZone) {
         handleGestureMove(e.touches[0].clientX, e.touches[0].clientY);
       }
     }, { passive: true });
 
     videoContainer.addEventListener('touchend', () => {
-      handleGestureEnd();
+      if (mobileGestureDevice) handleGestureEnd();
     });
 
-    let isMouseDown = false;
-    videoContainer.addEventListener('mousedown', (e) => {
-      if (e.target.closest('#videoControls') === null) {
-        isMouseDown = true;
-        handleGestureStart(e.clientX, e.clientY);
-      }
-    });
-
-    window.addEventListener('mousemove', (e) => {
-      if (isMouseDown) {
-        handleGestureMove(e.clientX, e.clientY);
-      }
-      autoHideControlsTimer();
-    });
-
-    window.addEventListener('mouseup', () => {
-      if (isMouseDown) {
-        isMouseDown = false;
-        handleGestureEnd();
-      }
-    });
+    // Brightness/volume swipe gestures are intentionally touch-only (mobile).
+    // Desktop mouse interaction is reserved for the native seek and volume sliders.
 
     // Track Switchers
     function detectAndPopulateMediaTracks() {
@@ -1699,8 +1829,10 @@
 
       videoObjectUrl = URL.createObjectURL(file);
       videoPlayer.src = videoObjectUrl;
+      videoContainer.classList.add('has-video');
       videoControls.classList.remove('hidden');
       videoControls.classList.remove('opacity-0', 'pointer-events-none');
+      videoContainer.classList.add('controls-visible');
       noVideoOverlay.classList.add('hidden');
       unloadVideoBtn.classList.remove('hidden');
 
@@ -1728,7 +1860,7 @@
       subtitleOverlay.classList.add('hidden');
       subDelayControls.classList.add('hidden');
 
-      videoContainer.classList.remove('has-video');
+      videoContainer.classList.remove('has-video', 'controls-visible');
 
       videoControls.classList.add('hidden');
       videoControls.classList.remove('opacity-0', 'pointer-events-none');
@@ -1790,8 +1922,9 @@
     }
 
     // Seek Bar Controls
+    let isSeeking = false;
     function updateSeekBarProgress() {
-      if (!isNaN(videoPlayer.duration) && videoPlayer.duration > 0) {
+      if (!isSeeking && !isNaN(videoPlayer.duration) && videoPlayer.duration > 0) {
         const percent = (videoPlayer.currentTime / videoPlayer.duration) * 100;
         seekBar.value = percent;
         seekBarFill.style.width = `${percent}%`;
@@ -1805,21 +1938,34 @@
       renderSubtitles();
     });
 
+    seekBar.addEventListener('pointerdown', () => {
+      isSeeking = true;
+      clearTimeout(controlsTimeout);
+      videoControls.classList.remove('opacity-0', 'pointer-events-none');
+    });
     seekBar.addEventListener('input', () => {
-      if (!isNaN(videoPlayer.duration)) {
-        const targetTime = (seekBar.value / 100) * videoPlayer.duration;
+      if (Number.isFinite(videoPlayer.duration) && videoPlayer.duration > 0) {
+        const targetTime = (Number(seekBar.value) / 100) * videoPlayer.duration;
         seekBarFill.style.width = `${seekBar.value}%`;
         currentTimeDisplay.textContent = formatTime(targetTime);
+        // Update during drag so seeking works with mouse, touch, and keyboard.
+        try { videoPlayer.currentTime = targetTime; } catch (_) {}
       }
     });
-
-    seekBar.addEventListener('change', () => {
-      if (!isNaN(videoPlayer.duration)) {
-        const targetTime = (seekBar.value / 100) * videoPlayer.duration;
-        videoPlayer.currentTime = targetTime;
-        emitPlaybackAction('SEEK');
+    function finishSeeking() {
+      if (!isSeeking) return;
+      isSeeking = false;
+      if (Number.isFinite(videoPlayer.duration) && videoPlayer.duration > 0) {
+        videoPlayer.currentTime = (Number(seekBar.value) / 100) * videoPlayer.duration;
+        emitPlaybackAction('SEEK', { currentTime: videoPlayer.currentTime });
+        updateSeekBarProgress();
       }
-    });
+      autoHideControlsTimer();
+    }
+    seekBar.addEventListener('change', finishSeeking);
+    seekBar.addEventListener('pointerup', finishSeeking);
+    seekBar.addEventListener('pointercancel', finishSeeking);
+    seekBar.addEventListener('blur', finishSeeking);
 
     seekBarContainer.addEventListener('mousemove', (e) => {
       const rect = seekBarContainer.getBoundingClientRect();
@@ -1858,8 +2004,11 @@
     });
 
     volumeSlider.addEventListener('input', (e) => {
-      setLocalVolume(parseFloat(e.target.value));
+      const value = parseFloat(e.target.value);
+      updateVolumeSliderVisual(value);
+      setLocalVolume(value);
     });
+    updateVolumeSliderVisual(Number(volumeSlider.value || 1));
 
     muteBtn.addEventListener('click', () => {
       if (videoPlayer.muted) setLocalVolume(videoPlayer.volume || 0.5);
@@ -1946,33 +2095,56 @@
 
     document.getElementById('sampleMovieBtn').addEventListener('click', () => {
       videoPlayer.src = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
+      videoContainer.classList.add('has-video', 'controls-visible');
+      videoControls.classList.remove('hidden', 'opacity-0', 'pointer-events-none');
       noVideoOverlay.classList.add('hidden');
       unloadVideoBtn.classList.remove('hidden');
       showToast("Loaded Sample Demo Clip", "info");
     });
 
-    // Emoji Reactions
-    document.querySelectorAll('.reaction-trigger').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const emoji = btn.getAttribute('data-emoji');
-        triggerFloatingEmoji(emoji);
+    // Reaction transport: guests send to the host; the host relays to every other peer.
+    // Coordinates are normalized to the player so every peer animates at the same location.
+    function emitReaction(emoji) {
+      if (typeof emoji !== 'string' || !emoji || emoji.length > 8) return;
+      const packet = {
+        type: 'EMOJI_REACTION',
+        emoji,
+        x: Math.round(10 + Math.random() * 80),
+        y: 8,
+        drift: Math.round(Math.random() * 90 - 45),
+        senderId: myProfile.id,
+        sentAt: Date.now()
+      };
+      triggerFloatingEmoji(packet.emoji, packet.x, packet.y, packet.drift);
+      if (isHost) broadcastData(packet);
+      else {
+        const host = activeConnections.find(conn => conn.open);
+        if (host) host.send(packet);
+      }
+    }
 
-        const payload = { type: 'EMOJI_REACTION', emoji };
-        if (isHost) broadcastData(payload);
-        else if (activeConnections[0]) activeConnections[0].send(payload);
-      });
+    // One delegated handler covers the tray and the compact reaction strip.
+    document.addEventListener('click', event => {
+      const button = event.target.closest('.reaction-trigger');
+      if (!button || !videoContainer.contains(button)) return;
+      event.preventDefault();
+      emitReaction(button.dataset.emoji);
+      if (button.closest('#reactionTray')) toggleReactionTray(false);
     });
 
-    function triggerFloatingEmoji(emoji) {
+    function triggerFloatingEmoji(emoji, x, y, drift) {
       const layer = document.getElementById('reactionLayer');
-      const el = document.createElement('div');
-      el.className = 'absolute text-3xl sm:text-4xl pointer-events-none z-30 animate-float-reaction drop-shadow-md';
+      if (!layer || typeof emoji !== 'string') return;
+      const el = document.createElement('span');
+      el.className = 'floating-reaction';
       el.textContent = emoji;
-      el.style.left = `${10 + Math.random() * 80}%`;
-      el.style.bottom = '80px';
-
+      el.style.setProperty('--x', `${Number.isFinite(x) ? Math.min(94, Math.max(6, x)) : 50}%`);
+      el.style.setProperty('--y', `${Number.isFinite(y) ? Math.min(90, Math.max(5, y)) : 8}%`);
+      el.style.setProperty('--drift', `${Number.isFinite(drift) ? Math.min(45, Math.max(-45, drift)) : 0}px`);
       layer.appendChild(el);
-      setTimeout(() => el.remove(), 2400);
+      el.addEventListener('animationend', () => el.remove(), { once: true });
+      // Guard against orphaned nodes if animationend is not fired by the browser.
+      window.setTimeout(() => el.remove(), 2600);
     }
 
     // Live Chat
@@ -2188,6 +2360,7 @@
       joinRoom(input);
     });
     leaveRoomBtn.addEventListener('click', leaveRoom);
+    document.getElementById('mobileLeaveRoomBtn').addEventListener('click', leaveRoom);
     document.getElementById('navLogo').addEventListener('click', () => {
       if (roomCode) leaveRoom();
     });
@@ -2210,85 +2383,48 @@
     const reactionTrayToggle = document.getElementById('reactionTrayToggle');
     const reactionTrayClose = document.getElementById('reactionTrayClose');
 
-    // Explicit integration hooks: only playback state is broadcast to the room.
-    function onGlobalPlay() {
-      if (!isRemoteCommand) emitPlaybackAction('PLAY');
-    }
-    function onGlobalPause() {
-      if (!isRemoteCommand) emitPlaybackAction('PAUSE');
-    }
-    function onGlobalSeek(targetTimeStamp) {
-      if (!isRemoteCommand) emitPlaybackAction('SEEK', { currentTime: targetTimeStamp });
-    }
-    // These local callbacks intentionally never broadcast.
-    function onLocalVolumeChange(value) { setLocalVolume(value); }
-    function onLocalBrightnessChange(value) { setLocalBrightness(value); }
-    function onLocalTrackToggle() { /* client-local track state only */ }
-
-    // Black overlay handles dimming on mobile; filter handles the >100% range.
-    const originalSetLocalBrightness = setLocalBrightness;
-    setLocalBrightness = function(value) {
-      originalSetLocalBrightness(value);
-      if (brightnessOverlay) {
-        brightnessOverlay.style.opacity = String(Math.max(0, 1 - localBrightness));
-        videoPlayer.style.filter = localBrightness > 1 ? `brightness(${localBrightness})` : 'none';
-      }
-      if (typeof onLocalBrightnessChange === 'function') {
-        // State update is local; this callback must not emit network traffic.
-      }
-    };
-
-    // Replace gesture callbacks with explicit local-only wrappers where invoked.
-    const originalSetLocalVolume = setLocalVolume;
-    setLocalVolume = function(value) {
-      originalSetLocalVolume(value);
-      if (typeof onLocalVolumeChange === 'function') {
-        // State update is local; this callback must not emit network traffic.
-      }
-    };
-
+    // Reaction tray state is separate from playback/control visibility.
     function toggleReactionTray(force) {
       const open = typeof force === 'boolean' ? force : !reactionTray.classList.contains('open');
+      const fullscreen = document.fullscreenElement === videoContainer;
+      if (fullscreen && !videoContainer.classList.contains('controls-visible')) return;
       reactionTray.classList.toggle('open', open);
       reactionTray.setAttribute('aria-hidden', String(!open));
       reactionTrayToggle.setAttribute('aria-expanded', String(open));
+      reactionTrayToggle.setAttribute('aria-label', open ? 'Close reactions' : 'Open reactions');
     }
-    reactionTrayToggle.addEventListener('click', () => toggleReactionTray());
+    reactionTrayToggle.addEventListener('click', event => {
+      event.stopPropagation();
+      toggleReactionTray();
+      if (document.fullscreenElement === videoContainer) showPlaybackControls();
+    });
     reactionTrayClose.addEventListener('click', () => toggleReactionTray(false));
-    reactionTray.addEventListener('click', event => {
-      const button = event.target.closest('.reaction-trigger');
-      if (button?.dataset.emoji) {
-        triggerFloatingEmoji(button.dataset.emoji);
-        const payload = { type: 'EMOJI_REACTION', emoji: button.dataset.emoji };
-        if (isHost) broadcastData(payload);
-        else if (activeConnections[0]?.open) activeConnections[0].send(payload);
+
+    function syncFullscreenReactionVisibility() {
+      const fullscreen = document.fullscreenElement === videoContainer;
+      toggleReactionTray(false);
+      if (fullscreen && videoContainer.classList.contains('has-video')) {
+        showPlaybackControls();
+      } else {
+        videoContainer.classList.remove('controls-visible');
       }
-    });
+    }
+    document.addEventListener('fullscreenchange', syncFullscreenReactionVisibility);
 
-    // Delegate reaction clicks from both the existing bar and the slide-over tray.
-    document.querySelectorAll('#fullscreenReactions .reaction-trigger').forEach(button => {
-      button.addEventListener('click', () => {
-        const emoji = button.dataset.emoji;
-        if (!emoji) return;
-        const payload = { type: 'EMOJI_REACTION', emoji };
-        if (isHost) broadcastData(payload);
-        else if (activeConnections[0]?.open) activeConnections[0].send(payload);
-      });
-    });
-
-    // Smoothly animate reactions using transform/opacity only.
-    triggerFloatingEmoji = function(emoji) {
-      const layer = document.getElementById('reactionLayer');
-      if (!layer) return;
-      const el = document.createElement('span');
-      el.className = 'floating-reaction';
-      el.textContent = emoji;
-      el.style.setProperty('--x', `${8 + Math.random() * 78}%`);
-      el.style.setProperty('--drift', `${Math.round(Math.random() * 90 - 45)}px`);
-      layer.appendChild(el);
-      el.addEventListener('animationend', () => el.remove(), { once: true });
+    // Keep the tray/FAB in step with the existing playback-control timeout.
+    const originalShowPlaybackControls = showPlaybackControls;
+    showPlaybackControls = function() {
+      originalShowPlaybackControls();
+      if (document.fullscreenElement === videoContainer) videoContainer.classList.add('controls-visible');
     };
-
+    const originalHidePlaybackControls = hidePlaybackControls;
+    hidePlaybackControls = function() {
+      originalHidePlaybackControls();
+      if (document.fullscreenElement === videoContainer && !videoPlayer.paused) {
+        videoContainer.classList.remove('controls-visible');
+        toggleReactionTray(false);
+      }
+    };
     // Keyboard shortcuts are disabled while typing into form controls.
     document.addEventListener('keydown', event => {
       const target = event.target;
@@ -2363,7 +2499,7 @@
     // a compatible browser codec and cannot be enabled by frontend code alone.
     audioTrackSelect.addEventListener('change', onLocalTrackToggle);
     subTrackSelect.addEventListener('change', onLocalTrackToggle);
-    volumeSlider.addEventListener('input', () => onLocalVolumeChange(Number(volumeSlider.value)));
+    // Volume slider is wired once above through setLocalVolume().
 
     // Keep pinch/selection browser behavior out of the actual player surface.
     videoContainer.addEventListener('contextmenu', event => event.preventDefault());
