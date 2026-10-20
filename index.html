@@ -977,8 +977,42 @@
 
     // Set false to silence diagnostic logs after testing.
     const CINESYNC_DEBUG = new URLSearchParams(location.search).has('debug');
+    // ---- Debug telemetry helpers (only do work with ?debug) ----
+    const DBG = { log: [], drift: null, rtt: null, hbAt: 0, hbGap: 0, hbGapMax: 0,
+                  lastSend: 0, sendGap: 0, sendGapMax: 0, hardSeeks: 0, nudges: 0, nudge: 0 };
+    function dbgPush(event, details) {
+      const parts = [];
+      for (const [k, v] of Object.entries(details || {})) {
+        if (v !== null && typeof v === 'object') continue;
+        parts.push(`${k}=${v}`);
+      }
+      DBG.log.push(`${Math.round(performance.now())}ms ${event} ${parts.join(' ')}`.slice(0, 200));
+      if (DBG.log.length > 400) DBG.log.shift();
+    }
+    function dbgHeartbeatArrived() {
+      if (!CINESYNC_DEBUG) return;
+      const now = performance.now();
+      if (DBG.hbAt) {
+        DBG.hbGap = Math.round(now - DBG.hbAt);
+        if (DBG.hbGap > DBG.hbGapMax) DBG.hbGapMax = DBG.hbGap;
+        if (DBG.hbGap > 2500) syncDebug('heartbeat-gap', { gapMs: DBG.hbGap });
+      }
+      DBG.hbAt = now;
+    }
+    function dbgHostSend() {
+      if (!CINESYNC_DEBUG) return;
+      const now = performance.now();
+      if (DBG.lastSend) {
+        DBG.sendGap = Math.round(now - DBG.lastSend);
+        if (DBG.sendGap > DBG.sendGapMax) DBG.sendGapMax = DBG.sendGap;
+        if (DBG.sendGap > 2500) syncDebug('host-send-gap', { gapMs: DBG.sendGap });
+      }
+      DBG.lastSend = now;
+    }
+
     function syncDebug(event, details = {}) {
       if (!CINESYNC_DEBUG) return;
+      dbgPush(event, details);
       console.debug(`[CineSync][${event}]`, {
         time: new Date().toISOString(),
         roomCode: roomCode || null,
@@ -1378,6 +1412,7 @@
       const now = Date.now();
       const rtt = now - data.t0;
       if (!(rtt >= 0) || !Number.isFinite(data.hostTime)) return;
+      DBG.rtt = rtt;
       clockSamples.push({ rtt, off: data.hostTime + rtt / 2 - now });
       if (clockSamples.length > 8) clockSamples.shift();
       clockOffset = clockSamples.reduce((a, b) => (b.rtt < a.rtt ? b : a)).off; // best (lowest-RTT) sample
@@ -1399,6 +1434,7 @@
     function broadcastHostHeartbeat() {
       if (!isHost || activeConnections.length === 0) return;
       if (Date.now() < seekSyncHoldUntil || videoPlayer.seeking || videoPlayer.readyState < 2) return;
+      dbgHostSend();
       broadcastData({ type: 'HOST_HEARTBEAT', playback: makePlayback() });
     }
 
@@ -1430,6 +1466,7 @@
     function applyRemoteSyncState(pb) {
       if (!pb || !Number.isFinite(pb.currentTime)) return;
       lastHostState = pb; // re-applied when this device finishes loading its copy of the movie
+      dbgHeartbeatArrived();
       if (!videoPlayer.getAttribute('src') || videoPlayer.readyState < 1) return;
       if (Date.now() < localHoldUntil) return;
 
@@ -1448,18 +1485,24 @@
       const expected = pb.isPlaying ? pb.currentTime + elapsedSince(pb.stamp) * baseRate : pb.currentTime;
       const drift = videoPlayer.currentTime - expected; // + = we are ahead
       const abs = Math.abs(drift);
+      DBG.drift = drift;
 
       if (abs > HARD_SEEK_DRIFT || (!pb.isPlaying && abs > 0.25)) {
         seekSyncHoldUntil = Date.now() + 1500; // let the seek settle before judging again
+        DBG.hardSeeks++;
+        syncDebug('hard-seek', { driftMs: Math.round(drift * 1000), ready: videoPlayer.readyState, playing: pb.isPlaying });
         videoPlayer.currentTime = expected;
         setRate(baseRate);
         setSyncStatus('syncing', abs);
       } else if (pb.isPlaying && abs > SOFT_DRIFT && videoPlayer.readyState >= 3) {
         const nudge = Math.max(-MAX_NUDGE, Math.min(MAX_NUDGE, -drift * 0.25));
+        DBG.nudges++;
+        DBG.nudge = nudge;
         setRate(baseRate * (1 + nudge));
         setSyncStatus('syncing', abs);
       } else {
         setRate(baseRate);
+        DBG.nudge = 0;
         setSyncStatus('synced');
       }
     }
@@ -2773,6 +2816,74 @@
       if (e.key === ' ' && roomScreen && !roomScreen.classList.contains('hidden') &&
           !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName || '')) e.preventDefault();
     });
+    // ---- Debug HUD (open the page with ?debug) ----
+    if (CINESYNC_DEBUG) {
+      const hud = document.createElement('div');
+      hud.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:99999;max-width:340px;padding:8px 10px;border-radius:8px;background:rgba(0,0,0,.85);color:#9fe;font:11px/1.4 ui-monospace,Menlo,Consolas,monospace;pointer-events:none';
+      const pre = document.createElement('pre');
+      pre.style.cssText = 'margin:0 0 6px;white-space:pre-wrap';
+      const btn = document.createElement('button');
+      btn.textContent = 'Copy debug report';
+      btn.style.cssText = 'pointer-events:auto;font:inherit;padding:3px 8px;border-radius:6px;border:1px solid #4a8;background:#143;color:#9fe;cursor:pointer';
+      hud.append(pre, btn);
+      document.body.appendChild(hud);
+
+      const bufferedAhead = () => {
+        const b = videoPlayer.buffered, t = videoPlayer.currentTime;
+        for (let i = 0; i < b.length; i++) if (t >= b.start(i) && t <= b.end(i)) return b.end(i) - t;
+        return 0;
+      };
+      const counts = { waiting: 0, stalled: 0, seeking: 0, error: 0 };
+      ['waiting', 'stalled', 'seeking', 'error'].forEach(ev => videoPlayer.addEventListener(ev, () => {
+        counts[ev]++;
+        syncDebug('video-' + ev, { t: +videoPlayer.currentTime.toFixed(2), ready: videoPlayer.readyState, net: videoPlayer.networkState });
+      }));
+      document.addEventListener('visibilitychange', () => syncDebug('page-' + document.visibilityState));
+
+      let lastQ = { total: 0, dropped: 0 }, dropped = 0, total = 0;
+      setInterval(() => {
+        const s = videoPlayer.getVideoPlaybackQuality ? videoPlayer.getVideoPlaybackQuality() : null;
+        if (!s) return;
+        dropped = s.droppedVideoFrames - lastQ.dropped;
+        total = s.totalVideoFrames - lastQ.total;
+        if (dropped < 0 || total < 0) { dropped = 0; total = 0; }
+        lastQ = { total: s.totalVideoFrames, dropped: s.droppedVideoFrames };
+        if (dropped > 3) syncDebug('dropped-frames', { dropped, of: total });
+      }, 1000);
+
+      setInterval(() => {
+        const age = DBG.hbAt ? Math.round(performance.now() - DBG.hbAt) : '-';
+        pre.textContent = [
+          `${isHost ? 'HOST' : 'GUEST'}  peers:${activeConnections.length}  ${document.visibilityState}${document.hasFocus() ? '' : ' (no focus)'}`,
+          `rtt:${DBG.rtt ?? '-'}ms  clockOffset:${Math.round(clockOffset)}ms`,
+          isHost
+            ? `heartbeat send gap now/max:${DBG.sendGap}/${DBG.sendGapMax}ms`
+            : `drift:${DBG.drift == null ? '-' : Math.round(DBG.drift * 1000)}ms  hb age:${age}ms  hb gap max:${DBG.hbGapMax}ms`,
+          `rate:${videoPlayer.playbackRate.toFixed(3)} (base ${baseRate})  nudges:${DBG.nudges}  hardSeeks:${DBG.hardSeeks}`,
+          `ready:${videoPlayer.readyState}  buffered:${bufferedAhead().toFixed(1)}s  ${videoPlayer.videoWidth}x${videoPlayer.videoHeight}`,
+          `dropped/1s:${dropped}/${total}  waiting:${counts.waiting} stalled:${counts.stalled}`
+        ].join('\n');
+      }, 250);
+
+      // One compact timeline line every 2s so the copied report shows how things evolve.
+      setInterval(() => {
+        if (!videoPlayer.getAttribute('src')) return;
+        dbgPush('sample', {
+          driftMs: DBG.drift == null ? '-' : Math.round(DBG.drift * 1000),
+          rate: +videoPlayer.playbackRate.toFixed(3), ready: videoPlayer.readyState,
+          buf: +bufferedAhead().toFixed(1), dropped, of: total, vis: document.visibilityState,
+          playing: !videoPlayer.paused
+        });
+      }, 2000);
+
+      btn.addEventListener('click', async () => {
+        const report = ['CineSync debug report', new Date().toISOString(), navigator.userAgent, pre.textContent,
+                        '--- events (newest last) ---', ...DBG.log.slice(-300)].join('\n');
+        try { await navigator.clipboard.writeText(report); btn.textContent = 'Copied ✓'; }
+        catch { console.log(report); btn.textContent = 'See console'; }
+        setTimeout(() => { btn.textContent = 'Copy debug report'; }, 1500);
+      });
+    }
   </script>
 </body>
 </html>
