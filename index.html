@@ -439,6 +439,52 @@
     @keyframes chatFlash { from { background: rgba(99,102,241,.4); } to { background: transparent; } }
     .chat-flash { animation: chatFlash 1.6s ease-out; border-radius: 12px; }
     #seekBarFill { transition: none; }
+  
+    /* --- Mobile + reaction-button fixes --- */
+    html { overflow-x: hidden; }
+    .reaction-tray-toggle { transition: opacity 220ms ease, visibility 220ms; }
+    #videoContainer:not(.controls-visible) .reaction-tray-toggle,
+    #videoContainer:not(.controls-visible) .reaction-tray {
+      opacity: 0 !important; visibility: hidden !important; pointer-events: none !important;
+    }
+    @media (max-width: 1023px) {
+      /* top-right, mirroring the Leave button, so it never covers the seek bar */
+      #videoContainer #reactionTrayToggle {
+        top: max(10px, env(safe-area-inset-top)) !important; bottom: auto !important;
+        right: max(10px, env(safe-area-inset-right)) !important; width: 42px !important; height: 42px !important;
+      }
+      #videoContainer #reactionTray {
+        top: calc(max(10px, env(safe-area-inset-top)) + 52px) !important; bottom: auto !important;
+        right: max(10px, env(safe-area-inset-right)) !important; max-height: calc(100% - 76px) !important;
+      }
+      /* no empty black band under the toolbar: chat takes the remaining height instead */
+      #stagePane { flex: 0 0 auto; }
+      #sidePane { flex: 1 1 auto; height: auto; min-height: 380px; max-height: 75dvh; overflow: hidden; }
+    }
+    @media (max-width: 639px) {
+      header.glass-card { padding-left: 10px; padding-right: 10px; gap: 8px; }
+      header #roomHeaderInfo { flex: 1 1 auto; min-width: 0; justify-content: center; gap: 6px; padding: 4px 8px; }
+      header #displayRoomCode { white-space: nowrap; font-size: 11px; }
+      header #leaveRoomBtn { flex: 0 0 auto; padding: 8px 11px; }
+      header #profileModalBtn { flex: 0 0 auto; }
+      /* inside a room: logo icon only and avatar only, so everything fits on one line */
+      header:has(#roomHeaderInfo:not(.hidden)) #navLogo { flex: 0 0 auto; }
+      header:has(#roomHeaderInfo:not(.hidden)) #navLogo > div:last-child { display: none; }
+      header:has(#roomHeaderInfo:not(.hidden)) #navUserName,
+      header:has(#roomHeaderInfo:not(.hidden)) #profileModalBtn .fa-gear { display: none; }
+    }
+  
+    /* --- Phones (portrait): control panel sits under the picture, not over it --- */
+    #videoContainer.has-video:fullscreen { touch-action: none; } /* fullscreen only: the player gets every swipe. In portrait the page scrolls normally. */
+    @media (max-width: 1023px) and (orientation: portrait) {
+      #videoContainer.has-video:not(:fullscreen) {
+        overflow: visible !important; contain: layout; margin-bottom: var(--ctrl-h, 0px);
+      }
+      #videoContainer.has-video:not(:fullscreen) #videoControls {
+        top: 100%; bottom: auto; background: #0b1220; padding: 10px 12px 12px;
+        opacity: 1 !important; pointer-events: auto !important; transform: none !important;
+      }
+    }
   </style>
 </head>
 
@@ -1350,6 +1396,14 @@
           if (isHost) senderConn.send({ type: 'PONG', t0: data.t0, hostTime: Date.now() });
           break;
 
+        case 'SEEK_READY':
+          if (isHost) hostMarkReady(senderConn.peer, data.time);
+          break;
+
+        case 'RESUME':
+          if (!isHost) scheduleResume(data);
+          break;
+
         case 'PONG':
           handlePong(data);
           break;
@@ -1391,7 +1445,7 @@
     let localHoldUntil = 0;      // ignore heartbeats right after an action (they are stale)
     let lastHostState = null;
     let lastSyncKey = '';
-    const HARD_SEEK_DRIFT = 1.2; // seconds: only then jump (a hard seek stutters)
+    const HARD_SEEK_DRIFT = 0.75; // seconds: only then jump (a hard seek stutters)
     const SOFT_DRIFT = 0.12;     // seconds: below this we count as in sync
     const MAX_NUDGE = 0.06;      // +-6% speed to glide back into sync
 
@@ -1431,9 +1485,72 @@
       if (o) speedSelect.value = o.value;
     }
 
+    // ---- Seek barrier: after a seek everyone pauses, waits until all devices are ready, then resumes together ----
+    let seekLatency = 0.25;   // seconds a seek takes on THIS device (moving average)
+    let seekStartedAt = 0;
+    let seekPending = null;   // { time } while this device waits for its own seek to finish
+    let barrier = null;       // host only: { time, waiting:Set, timer }
+    let resumeTimer = null;
+    const BARRIER_TIMEOUT_MS = 5000;
+    const RESUME_LEAD_MS = 300;
+
+    videoPlayer.addEventListener('seeking', () => { seekStartedAt = performance.now(); });
+    videoPlayer.addEventListener('seeked', () => {
+      if (seekStartedAt) {
+        const d = (performance.now() - seekStartedAt) / 1000;
+        seekLatency = Math.min(2, Math.max(0.05, seekLatency * 0.6 + d * 0.4));
+        seekStartedAt = 0;
+      }
+      announceSeekReady();
+    });
+    videoPlayer.addEventListener('canplay', announceSeekReady);
+    function announceSeekReady() {
+      if (!seekPending || videoPlayer.readyState < 3 || videoPlayer.seeking) return;
+      const time = videoPlayer.currentTime;
+      seekPending = null;
+      if (isHost) hostMarkReady('host', time);
+      else if (activeConnections[0]?.open) activeConnections[0].send({ type: 'SEEK_READY', time });
+    }
+    function startHostBarrier(time) {
+      if (!isHost) return;
+      if (barrier) clearTimeout(barrier.timer);
+      const waiting = new Set(['host']);
+      activeConnections.forEach(c => { if (c.open) waiting.add(c.peer); });
+      barrier = { time, waiting, timer: setTimeout(releaseBarrier, BARRIER_TIMEOUT_MS) };
+      syncDebug('barrier-start', { time: +time.toFixed(2), peers: waiting.size });
+    }
+    function hostMarkReady(id, time) {
+      if (!barrier || Math.abs(time - barrier.time) > 1.5) return;
+      barrier.waiting.delete(id);
+      if (barrier.waiting.size === 0) releaseBarrier();
+    }
+    function releaseBarrier() {
+      if (!barrier) return;
+      clearTimeout(barrier.timer);
+      const msg = { type: 'RESUME', time: barrier.time, at: Date.now() + RESUME_LEAD_MS };
+      barrier = null;
+      syncDebug('barrier-release', { at: msg.at });
+      broadcastData(msg);
+      scheduleResume(msg);
+    }
+    function scheduleResume({ time, at }) {
+      const wait = Math.max(0, at - hostNow());
+      localHoldUntil = Date.now() + wait + 1500; // ignore heartbeats that were sent before the resume
+      clearTimeout(resumeTimer);
+      resumeTimer = setTimeout(() => {
+        if (Math.abs(videoPlayer.currentTime - time) > 0.3 && !videoPlayer.seeking) videoPlayer.currentTime = time;
+        videoPlayer.play().catch(() => { pendingAutoplay = true; showToast('Tap the player to start playback.', 'info'); });
+      }, wait);
+    }
+    function cancelBarrier() {
+      clearTimeout(resumeTimer);
+      if (barrier) { clearTimeout(barrier.timer); barrier = null; }
+      seekPending = null;
+    }
+
     function broadcastHostHeartbeat() {
       if (!isHost || activeConnections.length === 0) return;
-      if (Date.now() < seekSyncHoldUntil || videoPlayer.seeking || videoPlayer.readyState < 2) return;
+      if (barrier || Date.now() < seekSyncHoldUntil || videoPlayer.seeking || videoPlayer.readyState < 2) return;
       dbgHostSend();
       broadcastData({ type: 'HOST_HEARTBEAT', playback: makePlayback() });
     }
@@ -1445,17 +1562,26 @@
       const target = data.currentTime + lag * baseRate;
       localHoldUntil = Date.now() + 800;
       if (data.action === 'PLAY') {
+        cancelBarrier();
         if (Math.abs(videoPlayer.currentTime - target) > 0.25) videoPlayer.currentTime = target;
         videoPlayer.play().catch(() => { pendingAutoplay = true; showToast('Tap the player to start playback.', 'info'); });
         appendSystemChatMessage(`${data.senderName} started playback ▶️`);
       } else if (data.action === 'PAUSE') {
+        cancelBarrier();
         videoPlayer.pause();
         if (Math.abs(videoPlayer.currentTime - data.currentTime) > 0.1) videoPlayer.currentTime = data.currentTime;
         appendSystemChatMessage(`${data.senderName} paused video ⏸️`);
       } else if (data.action === 'SEEK') {
         seekSyncHoldUntil = Date.now() + 1200;
         lastSeekCommandAt = Date.now();
-        videoPlayer.currentTime = target;
+        if (data.isPlaying) {
+          // Pause at the new spot; everybody resumes together once all devices are ready.
+          videoPlayer.pause();
+          seekPending = { time: data.currentTime };
+          localHoldUntil = Date.now() + BARRIER_TIMEOUT_MS + 1500;
+          if (isHost) startHostBarrier(data.currentTime);
+        }
+        videoPlayer.currentTime = data.currentTime;
       } else if (data.action === 'RATE' && Number.isFinite(data.rate)) {
         baseRate = data.rate;
         setRate(baseRate);
@@ -1491,7 +1617,7 @@
         seekSyncHoldUntil = Date.now() + 1500; // let the seek settle before judging again
         DBG.hardSeeks++;
         syncDebug('hard-seek', { driftMs: Math.round(drift * 1000), ready: videoPlayer.readyState, playing: pb.isPlaying });
-        videoPlayer.currentTime = expected;
+        videoPlayer.currentTime = expected + (pb.isPlaying ? seekLatency : 0); // land where playback will be when the seek finishes
         setRate(baseRate);
         setSyncStatus('syncing', abs);
       } else if (pb.isPlaying && abs > SOFT_DRIFT && videoPlayer.readyState >= 3) {
@@ -1510,6 +1636,9 @@
     function emitPlaybackAction(action, extra = {}) {
       const now = Date.now();
       localHoldUntil = now + 1000;
+      // Rapid repeated seeks (double-tap, scrubbing) stay "playing" until everyone resumes.
+      const wasPlaying = !videoPlayer.paused || !!seekPending || !!barrier;
+      if (action === 'PLAY' || action === 'PAUSE') cancelBarrier();
       if (action === 'SEEK') {
         lastSeekCommandAt = now;
         seekSyncHoldUntil = now + 1200;
@@ -1519,10 +1648,16 @@
         action,
         senderName: myProfile.name,
         currentTime: videoPlayer.currentTime,
-        isPlaying: !videoPlayer.paused,
+        isPlaying: wasPlaying,
         stamp: hostNow(),
         ...extra
       };
+      if (action === 'SEEK' && wasPlaying) {
+        videoPlayer.pause();
+        seekPending = { time: payload.currentTime };
+        localHoldUntil = now + BARRIER_TIMEOUT_MS + 1500;
+        if (isHost) startHostBarrier(payload.currentTime);
+      }
       syncDebug('playback-action-send', { action, currentTime: payload.currentTime });
       if (isHost) broadcastData(payload);
       else if (activeConnections[0]?.open) activeConnections[0].send(payload);
@@ -1676,106 +1811,101 @@
       }
     }
 
+    let gestureAxis = null;   // 'h' or 'v', decided once per touch so a swipe can't flip mid-way
+    let lastTouchEndAt = 0;
+    let tapSeek = { zone: null, total: 0, base: 0, timer: null, last: 0 };
+    const SWIPE_SEEK_WIDTH_SECONDS = 120; // dragging across the whole player = 2 minutes (was the whole movie)
+
     function handleGestureMove(x, y) {
-      const deltaY = touchStartY - y; // Swipe up increases value
-      const deltaX = touchStartX - x;
-
-      if (Math.abs(deltaY) > 8 || Math.abs(deltaX) > 8) {
+      const deltaX = x - touchStartX; // swipe right = positive
+      const deltaY = touchStartY - y; // swipe up = positive
+      if (!isDraggingGesture) {
+        if (Math.abs(deltaX) < 12 && Math.abs(deltaY) < 12) return; // finger jitter still counts as a tap
         isDraggingGesture = true;
+        gestureAxis = Math.abs(deltaX) > Math.abs(deltaY) ? 'h' : 'v';
       }
-
-      if (!isDraggingGesture) return;
-
       const rect = videoContainer.getBoundingClientRect();
-      // VLC-style horizontal scrub: dragging left rewinds, dragging right advances.
-      if (Math.abs(deltaX) > Math.abs(deltaY) * 1.15 && Number.isFinite(videoPlayer.duration) && videoPlayer.duration > 0) {
+      if (gestureAxis === 'h') {
+        const d = videoPlayer.duration;
+        if (!Number.isFinite(d) || d <= 0) return;
         gestureZone = 'seek';
-        const targetTime = Math.max(0, Math.min(videoPlayer.duration, initialGestureTime - (deltaX / Math.max(1, rect.width)) * videoPlayer.duration));
-        gestureTargetTime = targetTime;
-        const offset = Math.round(targetTime - initialGestureTime);
-        showVLCVisualHUD(offset < 0 ? 'fa-backward' : 'fa-forward', `${offset > 0 ? '+' : ''}${offset}s`, Math.abs(offset) / Math.max(1, videoPlayer.duration) * 100);
+        const span = Math.min(d, SWIPE_SEEK_WIDTH_SECONDS);
+        gestureTargetTime = Math.max(0, Math.min(d, initialGestureTime + (deltaX / Math.max(1, rect.width)) * span));
+        const offset = Math.round(gestureTargetTime - initialGestureTime);
+        showVLCVisualHUD(offset < 0 ? 'fa-backward' : 'fa-forward',
+          `${offset > 0 ? '+' : ''}${offset}s  (${formatTime(gestureTargetTime)})`, (gestureTargetTime / d) * 100);
         return;
       }
-
-      const sensitivity = deltaY / (rect.height * 0.6); // Scale gesture sensitivity
-      if (gestureZone === 'left') {
-        setLocalBrightness(initialGestureValue + sensitivity * 1.2);
-      } else if (gestureZone === 'right') {
-        setLocalVolume(initialGestureValue + sensitivity);
-      }
+      const change = deltaY / Math.max(1, rect.height * 0.8); // full range = 80% of the player height
+      if (gestureZone === 'left') setLocalBrightness(initialGestureValue + change * 1.3);
+      else if (gestureZone === 'right') setLocalVolume(initialGestureValue + change);
     }
 
-    
+    // Every extra tap on the same side adds 10s; the seek is applied and shared once, after the last tap.
+    function addTapSeek(dir) {
+      const d = videoPlayer.duration;
+      if (!Number.isFinite(d) || d <= 0) return;
+      const zoneName = dir < 0 ? 'left' : 'right';
+      if (tapSeek.zone !== zoneName || Date.now() - tapSeek.last > 450) {
+        tapSeek = { zone: zoneName, total: 0, base: videoPlayer.currentTime, timer: null, last: 0 };
+      }
+      tapSeek.total += dir * SEEK_SECONDS;
+      tapSeek.last = Date.now();
+      const target = Math.max(0, Math.min(d, tapSeek.base + tapSeek.total));
+      showVLCVisualHUD(dir < 0 ? 'fa-rotate-left' : 'fa-rotate-right',
+        `${tapSeek.total > 0 ? '+' : ''}${tapSeek.total} seconds`, 100);
+      clearTimeout(tapSeek.timer);
+      tapSeek.timer = setTimeout(() => {
+        videoPlayer.currentTime = target;
+        emitPlaybackAction('SEEK', { currentTime: target });
+        showPlaybackControls();
+      }, 350);
+    }
+
     function handleGestureEnd() {
-      if (!gestureZone) return;
-    
       const zone = gestureZone;
-      const x = touchStartX;
       const wasDragging = isDraggingGesture;
-    
-      isDraggingGesture = false;
+      const x = touchStartX;
       gestureZone = null;
-    
-      // Commit a horizontal swipe seek to the watch-party peers once, not on every move.
-      if (wasDragging) {
-        if (zone === 'seek') {
-          if (Number.isFinite(gestureTargetTime)) {
-            videoPlayer.currentTime = gestureTargetTime;
-            emitPlaybackAction('SEEK', { currentTime: gestureTargetTime });
-          }
-          showPlaybackControls();
-        }
+      isDraggingGesture = false;
+      gestureAxis = null;
+      if (!zone) return;
+      // Outside fullscreen (portrait) a tap only shows/hides the overlay buttons; swipes and double-taps are fullscreen-only.
+      if (!document.fullscreenElement) {
+        togglePlaybackControls();
         return;
       }
-    
-      const now = Date.now();
-    
-      const isDoubleTap =
-        now - lastTapTime <= DOUBLE_TAP_DELAY &&
-        Math.abs(x - lastTapX) < 80 &&
-        zone === lastTapZone;
-    
-      if (isDoubleTap && (zone === 'left' || zone === 'right')) {
-        clearTimeout(tapTimer);
-        tapTimer = null;
-        lastTapTime = 0;
-        lastTapZone = null;
-      
-        const direction = zone === 'left' ? -1 : 1;
-        const duration = Number.isFinite(videoPlayer.duration)
-          ? videoPlayer.duration
-          : Infinity;
-      
-        const targetTime = Math.max(
-          0,
-          Math.min(
-            duration,
-            videoPlayer.currentTime + direction * SEEK_SECONDS
-          )
-        );
-      
-        videoPlayer.currentTime = targetTime;
-      
-        emitPlaybackAction('SEEK', {
-          currentTime: targetTime
-        });
-      
-        showVLCVisualHUD(
-          direction < 0 ? 'fa-rotate-left' : 'fa-rotate-right',
-          `${direction < 0 ? '-' : '+'}10 seconds`,
-          100
-        );
-      
+
+      if (wasDragging) {
+        // A horizontal swipe is committed once, on release.
+        if (zone === 'seek' && Number.isFinite(gestureTargetTime) && Math.abs(gestureTargetTime - initialGestureTime) >= 1) {
+          videoPlayer.currentTime = gestureTargetTime;
+          emitPlaybackAction('SEEK', { currentTime: gestureTargetTime });
+        }
         showPlaybackControls();
         return;
       }
-    
+
+      const now = Date.now();
+      const isDouble = now - lastTapTime <= DOUBLE_TAP_DELAY && Math.abs(x - lastTapX) < 80 && zone === lastTapZone;
+      const inChain = tapSeek.zone === zone && now - tapSeek.last <= 450;
+
+      if (zone === 'center' && isDouble) { // VLC: double-tap the middle = play / pause
+        clearTimeout(tapTimer); tapTimer = null; lastTapTime = 0; lastTapZone = null;
+        togglePlayback();
+        showPlaybackControls();
+        return;
+      }
+      if ((zone === 'left' || zone === 'right') && (isDouble || inChain)) {
+        clearTimeout(tapTimer); tapTimer = null; lastTapTime = 0; lastTapZone = null;
+        addTapSeek(zone === 'left' ? -1 : 1);
+        return;
+      }
+
       lastTapTime = now;
       lastTapX = x;
       lastTapZone = zone;
-    
       clearTimeout(tapTimer);
-    
       tapTimer = setTimeout(() => {
         togglePlaybackControls();
         lastTapTime = 0;
@@ -1784,10 +1914,10 @@
       }, DOUBLE_TAP_DELAY);
     }
 
-
     // Desktop VLC-style double-click: left half rewinds 10s, right half advances 10s.
     // Ignore controls so double-clicking sliders/buttons keeps their native behavior.
     videoContainer.addEventListener('dblclick', (event) => {
+      if (Date.now() - lastTouchEndAt < 700) return; // touch taps are handled by the gesture code
       if (event.target.closest('#videoControls, #reactionTray, #reactionTrayToggle, #mobileLeaveRoomBtn, button, input, select, a')) return;
       if (!videoContainer.classList.contains('has-video') || !Number.isFinite(videoPlayer.duration)) return;
       const rect = videoContainer.getBoundingClientRect();
@@ -1802,22 +1932,33 @@
     });
 
     // Mouse & Touch Event Handlers
-    const mobileGestureDevice = window.matchMedia('(max-width: 767px) and (pointer: coarse)').matches;
+    // Any touch device (phones in landscape and tablets too, not only widths under 768px).
+    const mobileGestureDevice = window.matchMedia('(pointer: coarse)').matches ||
+      (navigator.maxTouchPoints > 0 && !window.matchMedia('(pointer: fine)').matches);
+    const GESTURE_IGNORE = '#videoControls, #reactionTray, #reactionTrayToggle, #mobileLeaveRoomBtn, #fullscreenChatToast';
     videoContainer.addEventListener('touchstart', (e) => {
-      if (mobileGestureDevice && e.touches.length === 1 && !e.target.closest('#videoControls, #reactionTray, #reactionTrayToggle')) {
+      if (mobileGestureDevice && e.touches.length === 1 && !e.target.closest(GESTURE_IGNORE)) {
         handleGestureStart(e.touches[0].clientX, e.touches[0].clientY);
+      } else {
+        gestureZone = null; isDraggingGesture = false; gestureAxis = null; // second finger / controls: no gesture
       }
     }, { passive: true });
 
     videoContainer.addEventListener('touchmove', (e) => {
-      if (mobileGestureDevice && e.touches.length === 1 && gestureZone) {
+      if (mobileGestureDevice && document.fullscreenElement && e.touches.length === 1 && gestureZone) {
         handleGestureMove(e.touches[0].clientX, e.touches[0].clientY);
       }
     }, { passive: true });
 
-    videoContainer.addEventListener('touchend', () => {
-      if (mobileGestureDevice) handleGestureEnd();
+    videoContainer.addEventListener('touchend', (e) => {
+      lastTouchEndAt = Date.now();
+      if (!mobileGestureDevice || !gestureZone) return;
+      // Stops the browser's follow-up synthetic click/dblclick, which used to seek a second time (+20s per double-tap).
+      if (e.cancelable && document.fullscreenElement) e.preventDefault();
+      handleGestureEnd();
     });
+    // Android cancels a touch when it takes over: reset instead of leaving a gesture half-open.
+    videoContainer.addEventListener('touchcancel', () => { gestureZone = null; isDraggingGesture = false; gestureAxis = null; });
 
     // Brightness/volume swipe gestures are intentionally touch-only (mobile).
     // Desktop mouse interaction is reserved for the native seek and volume sliders.
@@ -2094,6 +2235,7 @@
 
     function leaveRoom() {
       clearInterval(pingInterval);
+      cancelBarrier();
       lastHostState = null;
       activeConnections.forEach(c => { c._leaving = true; });
       if (peer) {
@@ -2816,6 +2958,16 @@
       if (e.key === ' ' && roomScreen && !roomScreen.classList.contains('hidden') &&
           !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName || '')) e.preventDefault();
     });
+    // Reserve room under the video for the control panel on phones so it never covers the picture.
+    if ('ResizeObserver' in window) {
+      new ResizeObserver(() => videoContainer.style.setProperty('--ctrl-h', `${videoControls.offsetHeight}px`)).observe(videoControls);
+    }
+
+    // Reaction button + Leave follow the control panel: both show/hide together.
+    ['loadedmetadata', 'pause'].forEach(ev => videoPlayer.addEventListener(ev, () => {
+      if (videoContainer.classList.contains('has-video')) videoContainer.classList.add('controls-visible');
+    }));
+
     // ---- Debug HUD (open the page with ?debug) ----
     if (CINESYNC_DEBUG) {
       const hud = document.createElement('div');
