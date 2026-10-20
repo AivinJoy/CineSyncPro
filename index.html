@@ -260,7 +260,7 @@
       position: absolute; z-index: 55; top: max(12px, env(safe-area-inset-top));
       right: max(12px, env(safe-area-inset-right)); width: 42px; height: 42px;
       border: 1px solid rgba(255,255,255,.18); border-radius: 14px;
-      color: #fff; background: rgba(2,6,23,.78); backdrop-filter: blur(12px);
+      color: #fff; background: rgba(2,6,23,.78); 
       display: flex; align-items: center; justify-content: center;
     }
     .reaction-tray {
@@ -268,7 +268,7 @@
       right: max(12px, env(safe-area-inset-right)); width: min(290px, calc(100% - 24px));
       max-height: min(70%, 520px); overflow: auto; padding: 14px;
       border: 1px solid rgba(148,163,184,.24); border-radius: 18px;
-      color: #e2e8f0; background: rgba(2,6,23,.88); backdrop-filter: blur(18px);
+      color: #e2e8f0; background: rgba(2,6,23,.88); 
       transform: translateX(calc(100% + 24px)); opacity: 0; pointer-events: none;
       transition: transform 180ms ease, opacity 180ms ease;
     }
@@ -282,7 +282,7 @@
     .reaction-pack button:active { transform:scale(.92); }
     .floating-reaction {
       position:absolute; bottom:var(--y, 8%); left:var(--x); font-size:clamp(28px,5vw,48px);
-      will-change:transform, opacity; animation: reaction-rise 2.2s cubic-bezier(.2,.7,.2,1) forwards;
+      will-change:transform, opacity; 
       filter:drop-shadow(0 3px 8px rgba(0,0,0,.45));
     }
     @keyframes reaction-rise {
@@ -297,10 +297,27 @@
       #videoContainer:fullscreen #videoControls select { max-width: min(27vw,120px); }
     }
     @media (prefers-reduced-motion: reduce) {
-      .floating-reaction { animation-duration: 1ms; }
+      
       .reaction-tray { transition:none; }
     }
 
+
+
+    /* Keep floating reactions above the video even when Tailwind is rebuilt. */
+    #reactionLayer { position:absolute; inset:0; z-index:46; pointer-events:none; overflow:hidden; isolation:isolate; }
+    .floating-reaction { position:absolute; z-index:47; bottom:var(--y, 8%); left:var(--x, 50%); font-size:clamp(32px,5vw,52px); line-height:1; pointer-events:none; text-shadow:0 2px 12px rgba(0,0,0,.9); }
+    #videoContainer:fullscreen #reactionLayer, #videoContainer:-webkit-full-screen #reactionLayer { z-index:46; }
+    #videoContainer:fullscreen .fullscreen-chat-toast, #videoContainer:-webkit-full-screen .fullscreen-chat-toast { z-index:70; }
+    .fullscreen-chat-toast { position:absolute; z-index:70; top:max(16px, env(safe-area-inset-top)); left:50%; transform:translateX(-50%); width:min(420px, calc(100% - 96px)); display:flex; align-items:center; gap:10px; padding:10px 14px; border:1px solid rgba(129,140,248,.4); border-radius:16px; background:rgba(2,6,23,.9); color:#f8fafc; box-shadow:0 12px 40px rgba(0,0,0,.45);  opacity:0; translate:0 -8px; transition:opacity 180ms ease, translate 180ms ease; pointer-events:none; }
+    .fullscreen-chat-toast.visible { opacity:1; translate:0 0; }
+    .fullscreen-chat-toast[hidden] { display:none; }
+    .chat-toast-icon { width:34px; height:34px; flex:0 0 34px; display:grid; place-items:center; border-radius:11px; background:rgba(99,102,241,.22); color:#c7d2fe; }
+    .chat-toast-copy { display:flex; flex-direction:column; min-width:0; gap:2px; }
+    .chat-toast-copy strong { font-size:11px; color:#c7d2fe; }
+    .chat-toast-copy span { font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #tabChatBtn { position:relative; }
+    .chat-unread-badge { min-width:17px; height:17px; padding:0 5px; display:inline-flex; align-items:center; justify-content:center; border-radius:999px; background:#f43f5e; color:white; font-size:10px; font-weight:800; line-height:1; box-shadow:0 0 0 2px #020617; }
+    @media (prefers-reduced-motion: reduce) { .fullscreen-chat-toast { transition:none; } }
 
     /* Responsive page flow: scrolling belongs to the document on small screens. */
     html, body { height: auto; min-height: 100%; overflow-x: clip; overflow-y: auto; }
@@ -333,7 +350,7 @@
     }
     @media (prefers-reduced-motion: reduce) {
       .reaction-tray { transition-duration: 0.01ms; }
-      .floating-reaction { animation-duration: 0.01ms; }
+      
     }
 
 
@@ -359,7 +376,7 @@
       z-index: 46; top:auto !important; bottom:84px !important; right:16px !important;
       width:40px !important; height:40px !important; border:1px solid rgba(255,255,255,.2) !important;
       border-radius:50% !important; background:rgba(2,6,23,.85) !important;
-      box-shadow:0 4px 18px rgba(0,0,0,.35) !important; backdrop-filter:blur(12px) !important;
+      box-shadow:0 4px 18px rgba(0,0,0,.35) !important; 
     }
     .reaction-tray {
       z-index:47; top:auto !important; bottom:132px !important; right:12px !important;
@@ -379,7 +396,7 @@
       min-height: 38px; padding: 0 12px; border-radius: 999px;
       color: #fff; font-size: 12px; font-weight: 700;
       border: 1px solid rgba(255,255,255,.22); background: rgba(2,6,23,.78);
-      backdrop-filter: blur(12px); box-shadow: 0 4px 16px rgba(0,0,0,.25);
+       box-shadow: 0 4px 16px rgba(0,0,0,.25);
       opacity: 0; visibility: hidden; pointer-events: none;
       transition: opacity 220ms ease, visibility 220ms ease;
     }
@@ -410,6 +427,18 @@
       #videoPlayer { position:relative; }
       #seekBar { opacity:1 !important; }
     }
+  
+    /* --- Production fixes --- */
+    @media (min-width: 1024px) {
+      /* flex:none matters: Tailwind's flex-1 on #roomScreen would otherwise override this height. */
+      #roomScreen:not(.hidden) { flex: none; height: calc(100dvh - 65px); align-items: stretch; overflow: hidden; }
+      #stagePane, #sidePane { height: auto; min-height: 0; overflow: hidden; }
+      #videoContainer, #videoContainer.has-video { flex: 1 1 0; min-height: 0; width: 100%; aspect-ratio: auto; align-self: stretch; }
+      #tabChatContent, #tabUsersContent { min-height: 0; }
+    }
+    @keyframes chatFlash { from { background: rgba(99,102,241,.4); } to { background: transparent; } }
+    .chat-flash { animation: chatFlash 1.6s ease-out; border-radius: 12px; }
+    #seekBarFill { transition: none; }
   </style>
 </head>
 
@@ -553,13 +582,13 @@
     <div id="roomScreen" class="hidden w-full flex-1 flex flex-col lg:flex-row min-h-0 overflow-visible">
       
       <!-- MAIN THEATER STAGE -->
-      <div class="flex-1 min-w-0 flex flex-col bg-black relative min-h-0 no-select">
+      <div id="stagePane" class="flex-1 min-w-0 flex flex-col bg-black relative min-h-0 no-select">
         
         <!-- Video Container -->
         <div id="videoContainer" class="relative w-full aspect-video bg-slate-950 flex items-center justify-center min-h-0 overflow-hidden group select-none">
           
           <!-- Native HTML5 Video Element -->
-          <video id="videoPlayer" class="w-full h-full object-contain max-h-[80vh] transition-[filter] duration-75" preload="metadata" crossorigin="anonymous" playsinline>
+          <video id="videoPlayer" class="w-full h-full object-contain max-h-[80vh]" preload="metadata" crossorigin="anonymous" playsinline>
             Your browser does not support HTML5 video.
           </video>
 
@@ -571,6 +600,10 @@
             class="mobile-player-leave">
             <i class="fa-solid fa-arrow-left"></i><span>Leave</span>
           </button>
+          <div id="fullscreenChatToast" class="fullscreen-chat-toast" aria-live="polite" aria-atomic="true" hidden>
+            <span class="chat-toast-icon"><i class="fa-solid fa-comment-dots"></i></span>
+            <span class="chat-toast-copy"><strong id="fullscreenChatSender">New message</strong><span id="fullscreenChatPreview"></span></span>
+          </div>
 
           <!-- Fullscreen-safe quick reaction drawer -->
           <button id="reactionTrayToggle" type="button" aria-label="Open reactions" aria-expanded="false"
@@ -598,7 +631,7 @@
 
           <!-- VLC GESTURE VISUAL HUD OVERLAY -->
           <div id="hudOverlay" class="absolute inset-0 pointer-events-none z-40 flex items-center justify-center opacity-0 transition-opacity duration-200">
-            <div class="bg-slate-900/90 border border-indigo-500/40 backdrop-blur-md px-6 py-4 rounded-2xl flex flex-col items-center gap-2 shadow-2xl min-w-[140px]">
+            <div class="bg-slate-900/90 border border-indigo-500/40 px-6 py-4 rounded-2xl flex flex-col items-center gap-2 shadow-2xl min-w-[140px]">
               <i id="hudIcon" class="fa-solid fa-sun text-2xl text-indigo-400"></i>
               <span id="hudText" class="font-mono font-bold text-xs text-slate-100">Brightness 100%</span>
               <div class="w-28 h-1.5 bg-slate-800 rounded-full overflow-hidden mt-1">
@@ -653,9 +686,9 @@
             <!-- Progress Bar Container -->
             <div id="seekBarContainer" class="relative w-full flex items-center mb-3 group/seek cursor-pointer py-1">
               <div class="w-full h-2 bg-slate-800/90 rounded-full overflow-hidden relative shadow-inner">
-                <div id="seekBarFill" class="h-full progress-bar-fill rounded-full transition-all duration-75 relative" style="width: 0%"></div>
+                <div id="seekBarFill" class="h-full w-full progress-bar-fill rounded-full relative" style="transform:scaleX(0);transform-origin:left center;will-change:transform"></div>
               </div>
-              <input type="range" id="seekBar" min="0" max="100" value="0" step="0.05" class="custom-progress-range absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+              <input type="range" id="seekBar" min="0" max="100" value="0" step="any" class="custom-progress-range absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
               <div id="seekTooltip" class="absolute bottom-6 -translate-x-1/2 pointer-events-none opacity-0 group-hover/seek:opacity-100 transition-opacity bg-slate-900/95 border border-purple-500/40 text-purple-200 text-[11px] font-mono px-2 py-0.5 rounded shadow-xl whitespace-nowrap z-20">
                 00:00:00
               </div>
@@ -753,7 +786,7 @@
       </div>
 
       <!-- RIGHT SIDEBAR (Chat & Participants Drawer) -->
-      <div class="w-full lg:w-80 lg:min-w-[320px] bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-800 flex flex-col h-[380px] lg:h-full shrink-0">
+      <div id="sidePane" class="w-full lg:w-80 lg:min-w-[320px] bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-800 flex flex-col h-[380px] lg:h-full shrink-0">
         
         <div class="flex border-b border-slate-800 bg-slate-950/60 shrink-0">
           <button id="tabChatBtn" class="flex-1 py-3 font-semibold text-xs border-b-2 border-indigo-500 text-indigo-400 flex items-center justify-center gap-2 transition-colors">
@@ -898,6 +931,17 @@
        CINASYNC PRO V3.1 ENGINE
        ========================================================================== */
 
+    // Add a TURN server for guests on mobile data / strict NATs (STUN alone fails for many of them).
+    const TURN_USER = 'fb6db49a4a997b436bff71f6';
+    const TURN_PASS = 'VSnQZAc69iwivsZ4';
+    const ICE_SERVERS = [
+      { urls: 'stun:stun.relay.metered.ca:80' },
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'turn:global.relay.metered.ca:80', username: TURN_USER, credential: TURN_PASS },
+      { urls: 'turn:global.relay.metered.ca:80?transport=tcp', username: TURN_USER, credential: TURN_PASS },
+      { urls: 'turn:global.relay.metered.ca:443', username: TURN_USER, credential: TURN_PASS },
+      { urls: 'turns:global.relay.metered.ca:443?transport=tcp', username: TURN_USER, credential: TURN_PASS }
+    ];
     let peer = null;
     let roomCode = null;
     let isHost = false;
@@ -924,6 +968,26 @@
     let isRemoteCommand = false;
     let heartbeatInterval = null;
     let controlsTimeout = null;
+    // Suppress stale heartbeat corrections briefly after a deliberate seek.
+    let seekSyncHoldUntil = 0;
+    let lastSeekCommandAt = 0;
+    let gestureTargetTime = 0;
+    let unreadChatCount = 0;
+    let chatToastTimer = null;
+
+    // Set false to silence diagnostic logs after testing.
+    const CINESYNC_DEBUG = new URLSearchParams(location.search).has('debug');
+    function syncDebug(event, details = {}) {
+      if (!CINESYNC_DEBUG) return;
+      console.debug(`[CineSync][${event}]`, {
+        time: new Date().toISOString(),
+        roomCode: roomCode || null,
+        isHost,
+        peerId: peer?.id || null,
+        connections: activeConnections.map(c => ({ peer: c.peer, open: c.open, type: c.type })),
+        ...details
+      });
+    }
 
     // Local Device VLC Controls State
     let localBrightness = 1.0; // 0.1 to 1.5 scale
@@ -994,6 +1058,10 @@
     const chatMessageContainer = document.getElementById('chatMessageContainer');
     const chatForm = document.getElementById('chatForm');
     const chatInput = document.getElementById('chatInput');
+    const fullscreenChatToast = document.getElementById('fullscreenChatToast');
+    const fullscreenChatSender = document.getElementById('fullscreenChatSender');
+    const fullscreenChatPreview = document.getElementById('fullscreenChatPreview');
+    const tabChatBtn = document.getElementById('tabChatBtn');
     const participantsList = document.getElementById('participantsList');
     const userCountBadge = document.getElementById('userCountBadge');
 
@@ -1060,17 +1128,15 @@
       }
     
       peer = new Peer(customPeerId || undefined, {
-        debug: 2,
+        debug: 1,
         config: {
-          iceServers: [
-            { urls: "stun:stun.l.google.com:19302" },
-            { urls: "stun:global.stun.twilio.com:3478" }
-          ]
+          iceServers: ICE_SERVERS
         }
       });
     
       peer.on("open", (id) => {
         console.log("PeerJS signaling connected. Peer ID:", id);
+        syncDebug('peer-open', { id });
         startPeerKeepAlive();
       
         if (onReadyCallback) {
@@ -1080,6 +1146,16 @@
     
       peer.on("disconnected", () => {
         console.error("PeerJS disconnected from the signaling server.");
+        syncDebug('peer-disconnected');
+        // PeerJS can reconnect the signaling socket without rebuilding the room ID.
+        if (peer && !peer.destroyed) {
+          window.setTimeout(() => {
+            if (peer && peer.disconnected && !peer.destroyed) {
+              syncDebug('peer-reconnect-attempt');
+              try { peer.reconnect(); } catch (err) { console.error('[CineSync] reconnect failed', err); }
+            }
+          }, 1200);
+        }
       });
     
       peer.on("error", (err) => {
@@ -1095,8 +1171,10 @@
       const newCode = generateRoomCode();
       const peerId = `cinesync-pro-${newCode}`;
 
+      console.info('[CineSync][room-create] Requested host peer ID:', peerId);
       initPeer(peerId, () => {
         isHost = true;
+        syncDebug('room-created', { roomCode: newCode, hostPeerId: peerId });
         roomCode = newCode;
         peersList = [{ ...myProfile, isHost: true }];
         
@@ -1108,7 +1186,7 @@
         });
 
         if (heartbeatInterval) clearInterval(heartbeatInterval);
-        heartbeatInterval = setInterval(broadcastHostHeartbeat, 750);
+        heartbeatInterval = setInterval(broadcastHostHeartbeat, 1000);
       });
     }
 
@@ -1120,15 +1198,26 @@
       }
 
       const hostPeerId = `cinesync-pro-${cleanCode}`;
+      console.info('[CineSync][room-join] Attempting host peer ID:', hostPeerId, 'from entered code:', cleanCode);
 
       initPeer(null, () => {
         isHost = false;
         roomCode = cleanCode;
 
         showToast(`Connecting to ${cleanCode}...`, 'info');
-        const conn = peer.connect(hostPeerId, { reliable: true });
+        const conn = peer.connect(hostPeerId, { reliable: true, serialization: 'json' });
+        syncDebug('connection-attempt', { targetPeerId: hostPeerId });
+        const connectWatchdog = window.setTimeout(() => {
+          if (!conn.open) {
+            console.warn('[CineSync][connection-timeout] Data connection still not open after 12 seconds.', {
+              targetPeerId: hostPeerId, peerStatus: peer?.disconnected ? 'signaling-disconnected' : 'signaling-connected'
+            });
+          }
+        }, 12000);
 
         conn.on('open', () => {
+          clearTimeout(connectWatchdog);
+          syncDebug('connection-open', { remotePeerId: conn.peer });
           activeConnections = [conn];
           enterTheaterUI();
           showToast(`Joined watch party ${roomCode}!`, 'success');
@@ -1141,35 +1230,46 @@
           setupConnectionListeners(conn);
         });
 
-        conn.on('error', () => {
-          showToast("Failed to connect. Make sure room code is correct and host is online.", "error");
+        conn.on('error', (err) => {
+          clearTimeout(connectWatchdog);
+          console.error('[CineSync][connection-error]', {
+            targetPeerId: hostPeerId, type: err?.type, message: err?.message, enteredCode: cleanCode
+          });
+          showToast("Failed to connect. Verify the room code and confirm the host is still online.", "error");
+        });
+        conn.on('close', () => {
+          clearTimeout(connectWatchdog);
+          syncDebug('connection-closed', { targetPeerId: hostPeerId });
         });
       });
     }
 
     function handleIncomingConnection(conn) {
+      syncDebug('incoming-connection', { remotePeerId: conn.peer });
       conn.on('open', () => {
+        syncDebug('incoming-connection-open', { remotePeerId: conn.peer });
         activeConnections.push(conn);
         setupConnectionListeners(conn);
 
         conn.send({
           type: 'ROOM_STATE',
-          playback: {
-            isPlaying: !videoPlayer.paused,
-            currentTime: videoPlayer.currentTime,
-            speed: videoPlayer.playbackRate
-          },
+          playback: makePlayback(),
           peers: peersList
         });
       });
     }
 
     function setupConnectionListeners(conn) {
+      syncDebug('listeners-attached', { remotePeerId: conn.peer });
+      if (!isHost) { sendPing(); clearInterval(pingInterval); pingInterval = setInterval(sendPing, 3000); }
       conn.on('data', (data) => {
+        if (data?.type !== 'HOST_HEARTBEAT') syncDebug('message-received', { from: conn.peer, type: data?.type, action: data?.action });
         handleNetworkMessage(data, conn);
       });
 
       conn.on('close', () => {
+        syncDebug('remote-connection-closed', { remotePeerId: conn.peer });
+        if (!isHost && roomCode && !conn._leaving) { clearInterval(pingInterval); setSyncStatus('offline'); showToast('Host disconnected. This party has ended.', 'error'); }
         activeConnections = activeConnections.filter(c => c !== conn);
         if (isHost) {
           peersList = peersList.filter(p => p.peerConnId !== conn.peer);
@@ -1212,12 +1312,21 @@
           if (!isHost) applyRemoteSyncState(data.playback);
           break;
 
+        case 'PING':
+          if (isHost) senderConn.send({ type: 'PONG', t0: data.t0, hostTime: Date.now() });
+          break;
+
+        case 'PONG':
+          handlePong(data);
+          break;
+
         case 'CHAT_MSG':
           appendChatMessage(data.msg);
           if (isHost) broadcastData(data, senderConn);
           break;
 
         case 'EMOJI_REACTION':
+          syncDebug('reaction-received', { emoji: data.emoji, senderId: data.senderId, x: data.x, y: data.y });
           if (typeof data.emoji !== 'string' || !/^.{1,8}$/u.test(data.emoji)) break;
           triggerFloatingEmoji(data.emoji, data.x, data.y, data.drift);
           if (isHost) broadcastData(data, senderConn);
@@ -1226,121 +1335,155 @@
     }
 
     function broadcastData(data, excludeConn = null) {
+      if (data?.type !== 'HOST_HEARTBEAT') syncDebug('message-broadcast', {
+        type: data?.type, action: data?.action, excludePeer: excludeConn?.peer || null
+      });
       activeConnections.forEach(conn => {
         if (conn !== excludeConn && conn.open) {
           conn.send(data);
+        } else if (conn !== excludeConn && !conn.open) {
+          console.warn('[CineSync] Skipping message for closed connection.', { type: data?.type, peer: conn.peer });
         }
       });
+    }
+
+    /* ==========================================================================
+       SYNC ENGINE: host-clock timestamps, RTT-compensated, glide-don't-jump correction
+       ========================================================================== */
+    let baseRate = 1;            // speed people chose; playbackRate is nudged around it
+    let clockOffset = 0;         // hostClock ~= Date.now() + clockOffset (guests only)
+    const clockSamples = [];
+    let pingInterval = null;
+    let localHoldUntil = 0;      // ignore heartbeats right after an action (they are stale)
+    let lastHostState = null;
+    let lastSyncKey = '';
+    const HARD_SEEK_DRIFT = 1.2; // seconds: only then jump (a hard seek stutters)
+    const SOFT_DRIFT = 0.12;     // seconds: below this we count as in sync
+    const MAX_NUDGE = 0.06;      // +-6% speed to glide back into sync
+
+    const hostNow = () => Date.now() + (isHost ? 0 : clockOffset);
+
+    function makePlayback() {
+      return { isPlaying: !videoPlayer.paused, currentTime: videoPlayer.currentTime, speed: baseRate, stamp: hostNow() };
+    }
+    function elapsedSince(stamp, max = 5) {
+      if (!Number.isFinite(stamp)) return 0;
+      return Math.max(0, Math.min(max, (hostNow() - stamp) / 1000));
+    }
+    function sendPing() {
+      const c = activeConnections[0];
+      if (!isHost && c?.open) c.send({ type: 'PING', t0: Date.now() });
+    }
+    function handlePong(data) {
+      const now = Date.now();
+      const rtt = now - data.t0;
+      if (!(rtt >= 0) || !Number.isFinite(data.hostTime)) return;
+      clockSamples.push({ rtt, off: data.hostTime + rtt / 2 - now });
+      if (clockSamples.length > 8) clockSamples.shift();
+      clockOffset = clockSamples.reduce((a, b) => (b.rtt < a.rtt ? b : a)).off; // best (lowest-RTT) sample
+    }
+    function setSyncStatus(state, drift = 0) {
+      const text = state === 'syncing' ? `SYNCING (${Math.round(drift * 1000)}ms)` : state === 'offline' ? 'DISCONNECTED' : 'SYNCED';
+      if (syncStatusText.textContent !== text) syncStatusText.textContent = text;
+      if (state === lastSyncKey) return;
+      lastSyncKey = state;
+      syncPulseDot.className = 'w-2 h-2 rounded-full ' +
+        (state === 'syncing' ? 'bg-amber-400 animate-ping' : state === 'offline' ? 'bg-rose-500' : 'bg-emerald-400 animate-pulse');
+    }
+    function setRate(r) { if (Math.abs(videoPlayer.playbackRate - r) > 0.001) videoPlayer.playbackRate = r; }
+    function setSpeedUI(r) {
+      const o = Array.from(speedSelect.options).find(opt => parseFloat(opt.value) === r);
+      if (o) speedSelect.value = o.value;
     }
 
     function broadcastHostHeartbeat() {
       if (!isHost || activeConnections.length === 0) return;
-      broadcastData({
-        type: 'HOST_HEARTBEAT',
-        playback: {
-          isPlaying: !videoPlayer.paused,
-          currentTime: videoPlayer.currentTime,
-          speed: videoPlayer.playbackRate
-        }
-      });
+      if (Date.now() < seekSyncHoldUntil || videoPlayer.seeking || videoPlayer.readyState < 2) return;
+      broadcastData({ type: 'HOST_HEARTBEAT', playback: makePlayback() });
     }
 
     function applyRemotePlaybackAction(data) {
-      isRemoteCommand = true;
-
+      if (!Number.isFinite(data.currentTime)) return;
+      syncDebug('remote-playback-action', { action: data.action, targetTime: data.currentTime });
+      const lag = data.isPlaying ? elapsedSince(data.stamp, 3) : 0; // one-way delay of this message
+      const target = data.currentTime + lag * baseRate;
+      localHoldUntil = Date.now() + 800;
       if (data.action === 'PLAY') {
-        videoPlayer.currentTime = data.currentTime;
-        videoPlayer.play().catch(() => {});
+        if (Math.abs(videoPlayer.currentTime - target) > 0.25) videoPlayer.currentTime = target;
+        videoPlayer.play().catch(() => { pendingAutoplay = true; showToast('Tap the player to start playback.', 'info'); });
         appendSystemChatMessage(`${data.senderName} started playback ▶️`);
       } else if (data.action === 'PAUSE') {
-        videoPlayer.currentTime = data.currentTime;
         videoPlayer.pause();
+        if (Math.abs(videoPlayer.currentTime - data.currentTime) > 0.1) videoPlayer.currentTime = data.currentTime;
         appendSystemChatMessage(`${data.senderName} paused video ⏸️`);
       } else if (data.action === 'SEEK') {
-        if (Number.isFinite(data.currentTime)) videoPlayer.currentTime = data.currentTime;
-      } else if (data.action === 'RATE') {
-        videoPlayer.playbackRate = data.rate;
-        speedSelect.value = data.rate.toString();
-      }
-
-      setTimeout(() => { isRemoteCommand = false; }, 300);
-    }
-
-    
-    function applyRemoteSyncState(playback) {
-      if (
-        !playback ||
-        !videoPlayer.src ||
-        !Number.isFinite(playback.currentTime)
-      ) {
-        return;
-      }
-    
-      isRemoteCommand = true;
-    
-      try {
-        // Synchronize play/pause state.
-        if (playback.isPlaying && videoPlayer.paused) {
-          videoPlayer.play().catch(() => {
-            showToast(
-              'Tap Play to allow playback on this device.',
-              'info'
-            );
-          });
-        } else if (!playback.isPlaying && !videoPlayer.paused) {
-          videoPlayer.pause();
-        }
-      
-        // Synchronize playback speed.
-        if (
-          Number.isFinite(playback.speed) &&
-          videoPlayer.playbackRate !== playback.speed
-        ) {
-          videoPlayer.playbackRate = playback.speed;
-          speedSelect.value = String(playback.speed);
-        }
-      
-        // Correct noticeable timing drift.
-        const drift = Math.abs(
-          videoPlayer.currentTime - playback.currentTime
-        );
-      
-        if (drift > 0.35) {
-          videoPlayer.currentTime = playback.currentTime;
-        
-          syncStatusText.textContent =
-            `SYNCING (${Math.round(drift * 1000)}ms)`;
-        
-          syncPulseDot.className =
-            'w-2 h-2 rounded-full bg-amber-400 animate-ping';
-        } else {
-          syncStatusText.textContent = 'SYNCED';
-        
-          syncPulseDot.className =
-            'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
-        }
-      } finally {
-        setTimeout(() => {
-          isRemoteCommand = false;
-        }, 300);
+        seekSyncHoldUntil = Date.now() + 1200;
+        lastSeekCommandAt = Date.now();
+        videoPlayer.currentTime = target;
+      } else if (data.action === 'RATE' && Number.isFinite(data.rate)) {
+        baseRate = data.rate;
+        setRate(baseRate);
+        setSpeedUI(baseRate);
       }
     }
 
+    function applyRemoteSyncState(pb) {
+      if (!pb || !Number.isFinite(pb.currentTime)) return;
+      lastHostState = pb; // re-applied when this device finishes loading its copy of the movie
+      if (!videoPlayer.getAttribute('src') || videoPlayer.readyState < 1) return;
+      if (Date.now() < localHoldUntil) return;
+
+      if (Number.isFinite(pb.speed) && pb.speed !== baseRate) {
+        baseRate = pb.speed;
+        setRate(baseRate);
+        setSpeedUI(baseRate);
+      }
+      if (pb.isPlaying && videoPlayer.paused) {
+        videoPlayer.play().catch(() => { pendingAutoplay = true; showToast('Tap the player to start playback.', 'info'); });
+      } else if (!pb.isPlaying && !videoPlayer.paused) {
+        videoPlayer.pause();
+      }
+      if (videoPlayer.seeking || Date.now() < seekSyncHoldUntil) return;
+
+      const expected = pb.isPlaying ? pb.currentTime + elapsedSince(pb.stamp) * baseRate : pb.currentTime;
+      const drift = videoPlayer.currentTime - expected; // + = we are ahead
+      const abs = Math.abs(drift);
+
+      if (abs > HARD_SEEK_DRIFT || (!pb.isPlaying && abs > 0.25)) {
+        seekSyncHoldUntil = Date.now() + 1500; // let the seek settle before judging again
+        videoPlayer.currentTime = expected;
+        setRate(baseRate);
+        setSyncStatus('syncing', abs);
+      } else if (pb.isPlaying && abs > SOFT_DRIFT && videoPlayer.readyState >= 3) {
+        const nudge = Math.max(-MAX_NUDGE, Math.min(MAX_NUDGE, -drift * 0.25));
+        setRate(baseRate * (1 + nudge));
+        setSyncStatus('syncing', abs);
+      } else {
+        setRate(baseRate);
+        setSyncStatus('synced');
+      }
+    }
 
     function emitPlaybackAction(action, extra = {}) {
-      if (isRemoteCommand) return;
-
+      const now = Date.now();
+      localHoldUntil = now + 1000;
+      if (action === 'SEEK') {
+        lastSeekCommandAt = now;
+        seekSyncHoldUntil = now + 1200;
+      }
       const payload = {
         type: 'PLAYBACK_ACTION',
-        action: action,
+        action,
         senderName: myProfile.name,
         currentTime: videoPlayer.currentTime,
-        issuedAt: Date.now(),
+        isPlaying: !videoPlayer.paused,
+        stamp: hostNow(),
         ...extra
       };
-
+      syncDebug('playback-action-send', { action, currentTime: payload.currentTime });
       if (isHost) broadcastData(payload);
-      else if (activeConnections[0]) activeConnections[0].send(payload);
+      else if (activeConnections[0]?.open) activeConnections[0].send(payload);
+      else showToast('Not connected to the host, so that action was not shared.', 'error');
     }
 
     /* ==========================================================================
@@ -1360,8 +1503,10 @@
     }
 
     function setLocalBrightness(val) {
-      localBrightness = Math.max(0.1, Math.min(1.5, val));
-      videoPlayer.style.filter = `brightness(${localBrightness})`;
+      localBrightness = Math.max(0.2, Math.min(1.5, val));
+      // Dim with an overlay (cheap); only a boost above 100% needs a CSS filter on the video.
+      brightnessOverlay.style.opacity = localBrightness < 1 ? String(1 - localBrightness) : '0';
+      videoPlayer.style.filter = localBrightness > 1 ? `brightness(${localBrightness})` : 'none';
       const displayPercent = Math.round((localBrightness / 1.5) * 100);
       showVLCVisualHUD('fa-sun', `Brightness ${displayPercent}%`, displayPercent);
     }
@@ -1473,6 +1618,7 @@
       touchStartX = x;
       touchStartY = y;
       initialGestureTime = Number.isFinite(videoPlayer.currentTime) ? videoPlayer.currentTime : 0;
+      gestureTargetTime = initialGestureTime;
       isDraggingGesture = false;
 
       // Classify Screen Zones: Left (0-40%), Center (40-60%), Right (60-100%)
@@ -1502,7 +1648,7 @@
       if (Math.abs(deltaX) > Math.abs(deltaY) * 1.15 && Number.isFinite(videoPlayer.duration) && videoPlayer.duration > 0) {
         gestureZone = 'seek';
         const targetTime = Math.max(0, Math.min(videoPlayer.duration, initialGestureTime - (deltaX / Math.max(1, rect.width)) * videoPlayer.duration));
-        videoPlayer.currentTime = targetTime;
+        gestureTargetTime = targetTime;
         const offset = Math.round(targetTime - initialGestureTime);
         showVLCVisualHUD(offset < 0 ? 'fa-backward' : 'fa-forward', `${offset > 0 ? '+' : ''}${offset}s`, Math.abs(offset) / Math.max(1, videoPlayer.duration) * 100);
         return;
@@ -1530,7 +1676,10 @@
       // Commit a horizontal swipe seek to the watch-party peers once, not on every move.
       if (wasDragging) {
         if (zone === 'seek') {
-          emitPlaybackAction('SEEK', { currentTime: videoPlayer.currentTime });
+          if (Number.isFinite(gestureTargetTime)) {
+            videoPlayer.currentTime = gestureTargetTime;
+            emitPlaybackAction('SEEK', { currentTime: gestureTargetTime });
+          }
           showPlaybackControls();
         }
         return;
@@ -1682,7 +1831,7 @@
 
           track.oncuechange = () => {
             if (activeSubTrackMode === `embedded_${i}`) {
-              activeEmbeddedSubText = (track.activeCues && track.activeCues.length > 0) ? track.activeCues[0].text : '';
+              activeEmbeddedSubText = Array.from(track.activeCues || []).map(c => String(c.text).replace(/<[^>]*>/g, '')).join('\n');
               renderSubtitles();
             }
           };
@@ -1761,7 +1910,7 @@
 
     function parseSubtitleText(text) {
       const cues = [];
-      const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      const normalized = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
       const blocks = normalized.split(/\n\n+/);
 
       blocks.forEach(block => {
@@ -1769,11 +1918,11 @@
         if (lines.length >= 2) {
           let timeLineIndex = lines.findIndex(l => l.includes('-->'));
           if (timeLineIndex !== -1) {
-            const timeMatch = lines[timeLineIndex].match(/(\d{2}:\d{2}:\d{2}[.,]\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}[.,]\d{3})/);
+            const timeMatch = lines[timeLineIndex].match(/((?:\d{1,2}:)?\d{1,2}:\d{2}[.,]\d{1,3})\s*-->\s*((?:\d{1,2}:)?\d{1,2}:\d{2}[.,]\d{1,3})/);
             if (timeMatch) {
               const start = parseTimestampToSeconds(timeMatch[1]);
               const end = parseTimestampToSeconds(timeMatch[2]);
-              const cueText = lines.slice(timeLineIndex + 1).join('<br>').replace(/<[^>]*>/g, '');
+              const cueText = lines.slice(timeLineIndex + 1).map(l => l.replace(/<[^>]*>/g, '').replace(/\{\\an?\d\}/g, '').trim()).filter(Boolean).join('\n');
 
               if (!isNaN(start) && !isNaN(end) && cueText) {
                 cues.push({ start, end, text: cueText });
@@ -1783,44 +1932,48 @@
         }
       });
 
-      return cues;
+      return cues.sort((a, b) => a.start - b.start);
     }
 
     function parseTimestampToSeconds(str) {
-      const parts = str.replace(',', '.').split(':');
-      if (parts.length === 3) {
-        const hrs = parseFloat(parts[0]);
-        const mins = parseFloat(parts[1]);
-        const secs = parseFloat(parts[2]);
-        return hrs * 3600 + mins * 60 + secs;
-      }
-      return 0;
+      const p = str.replace(',', '.').split(':').map(parseFloat);
+      if (p.some(Number.isNaN)) return NaN;
+      return p.length === 3 ? p[0] * 3600 + p[1] * 60 + p[2] : p.length === 2 ? p[0] * 60 + p[1] : NaN;
     }
 
+    let lastSubText = null, cueIdx = 0;
+    function hideSubs() { subtitleOverlay.classList.add('hidden'); lastSubText = null; }
+    function setSubtitleText(text) {
+      if (text !== lastSubText) {
+        lastSubText = text;
+        subtitleText.replaceChildren();
+        text.split('\n').forEach((line, i) => {
+          if (i) subtitleText.appendChild(document.createElement('br'));
+          subtitleText.appendChild(document.createTextNode(line));
+        });
+      }
+      subtitleOverlay.classList.remove('hidden');
+    }
     function renderSubtitles() {
       if (activeSubTrackMode === 'off') {
-        subtitleOverlay.classList.add('hidden');
+        if (lastSubText !== null || !subtitleOverlay.classList.contains('hidden')) hideSubs();
         return;
       }
-
+      let text = '';
       if (activeSubTrackMode === 'custom') {
-        const currentTime = videoPlayer.currentTime - subtitleDelay;
-        const activeCue = subtitleCues.find(cue => currentTime >= cue.start && currentTime <= cue.end);
-
-        if (activeCue) {
-          subtitleText.innerHTML = activeCue.text;
-          subtitleOverlay.classList.remove('hidden');
-        } else {
-          subtitleOverlay.classList.add('hidden');
+        const t = videoPlayer.currentTime - subtitleDelay;
+        let c = subtitleCues[cueIdx];
+        if (!c || t < c.start || t > c.end) {
+          cueIdx = subtitleCues.findIndex(cue => t >= cue.start && t <= cue.end);
+          c = cueIdx >= 0 ? subtitleCues[cueIdx] : null;
+          if (cueIdx < 0) cueIdx = 0;
         }
+        text = c ? c.text : '';
       } else if (activeSubTrackMode.startsWith('embedded_')) {
-        if (activeEmbeddedSubText) {
-          subtitleText.innerHTML = activeEmbeddedSubText;
-          subtitleOverlay.classList.remove('hidden');
-        } else {
-          subtitleOverlay.classList.add('hidden');
-        }
+        text = activeEmbeddedSubText;
       }
+      if (text) setSubtitleText(text);
+      else if (lastSubText !== null) hideSubs();
     }
 
     // Video Unload/Delete
@@ -1867,7 +2020,7 @@
       clearTimeout(controlsTimeout);
 
       seekBar.value = 0;
-      seekBarFill.style.width = '0%';
+      setFill(0); lastShownSec = -1; lastShownDur = -1;
       currentTimeDisplay.textContent = '00:00:00';
       durationDisplay.textContent = '00:00:00';
 
@@ -1897,6 +2050,9 @@
     }
 
     function leaveRoom() {
+      clearInterval(pingInterval);
+      lastHostState = null;
+      activeConnections.forEach(c => { c._leaving = true; });
       if (peer) {
         if (peerKeepAliveInterval) clearInterval(peerKeepAliveInterval);
         peer.destroy();
@@ -1923,19 +2079,49 @@
 
     // Seek Bar Controls
     let isSeeking = false;
+    function setFill(p) { seekBarFill.style.transform = `scaleX(${Math.max(0, Math.min(100, p)) / 100})`; }
+    let lastShownSec = -1, lastShownDur = -1;
     function updateSeekBarProgress() {
-      if (!isSeeking && !isNaN(videoPlayer.duration) && videoPlayer.duration > 0) {
-        const percent = (videoPlayer.currentTime / videoPlayer.duration) * 100;
-        seekBar.value = percent;
-        seekBarFill.style.width = `${percent}%`;
-        currentTimeDisplay.textContent = formatTime(videoPlayer.currentTime);
-        durationDisplay.textContent = formatTime(videoPlayer.duration);
-      }
+      const d = videoPlayer.duration;
+      if (isSeeking || !Number.isFinite(d) || d <= 0) return;
+      const t = videoPlayer.currentTime;
+      const percent = (t / d) * 100;
+      seekBar.value = percent;
+      setFill(percent);
+      const sec = Math.floor(t);
+      if (sec !== lastShownSec) { lastShownSec = sec; currentTimeDisplay.textContent = formatTime(t); }
+      if (Math.floor(d) !== lastShownDur) { lastShownDur = Math.floor(d); durationDisplay.textContent = formatTime(d); }
     }
 
-    videoPlayer.addEventListener('timeupdate', () => {
+    ['seeking', 'seeked', 'waiting', 'stalled', 'playing', 'pause', 'error'].forEach(eventName => {
+      videoPlayer.addEventListener(eventName, () => {
+        if (eventName === 'timeupdate') return;
+        syncDebug(`video-${eventName}`, {
+          currentTime: Number.isFinite(videoPlayer.currentTime) ? Number(videoPlayer.currentTime.toFixed(3)) : null,
+          readyState: videoPlayer.readyState, networkState: videoPlayer.networkState,
+          paused: videoPlayer.paused, playbackRate: videoPlayer.playbackRate,
+          mediaError: videoPlayer.error ? { code: videoPlayer.error.code, message: videoPlayer.error.message } : null
+        });
+      });
+    });
+
+    let uiRaf = 0;
+    function uiLoop() {
       updateSeekBarProgress();
       renderSubtitles();
+      uiRaf = videoPlayer.paused ? 0 : requestAnimationFrame(uiLoop);
+    }
+    videoPlayer.addEventListener('play', () => { if (!uiRaf) uiRaf = requestAnimationFrame(uiLoop); });
+    ['timeupdate', 'pause', 'seeked', 'ended'].forEach(ev =>
+      videoPlayer.addEventListener(ev, () => { updateSeekBarProgress(); renderSubtitles(); }));
+
+    videoPlayer.addEventListener('seeked', () => {
+      // Keep the requested position authoritative for a short settling window.
+      if (Date.now() < seekSyncHoldUntil) {
+        syncStatusText.textContent = 'SYNCED';
+        syncPulseDot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+      }
+      updateSeekBarProgress();
     });
 
     seekBar.addEventListener('pointerdown', () => {
@@ -1946,23 +2132,27 @@
     seekBar.addEventListener('input', () => {
       if (Number.isFinite(videoPlayer.duration) && videoPlayer.duration > 0) {
         const targetTime = (Number(seekBar.value) / 100) * videoPlayer.duration;
-        seekBarFill.style.width = `${seekBar.value}%`;
+        setFill(Number(seekBar.value));
         currentTimeDisplay.textContent = formatTime(targetTime);
-        // Update during drag so seeking works with mouse, touch, and keyboard.
-        try { videoPlayer.currentTime = targetTime; } catch (_) {}
+        // Preview only while dragging; committing every input event repeatedly
+        // restarts decoder seeks and can make playback stutter or jump.
+        seekBar.setAttribute('aria-valuetext', formatTime(targetTime));
       }
     });
     function finishSeeking() {
       if (!isSeeking) return;
       isSeeking = false;
       if (Number.isFinite(videoPlayer.duration) && videoPlayer.duration > 0) {
-        videoPlayer.currentTime = (Number(seekBar.value) / 100) * videoPlayer.duration;
-        emitPlaybackAction('SEEK', { currentTime: videoPlayer.currentTime });
+        const targetTime = Math.max(0, Math.min(videoPlayer.duration, (Number(seekBar.value) / 100) * videoPlayer.duration));
+        videoPlayer.currentTime = targetTime;
+        emitPlaybackAction('SEEK', { currentTime: targetTime });
+        seekSyncHoldUntil = Date.now() + 1800;
         updateSeekBarProgress();
       }
       autoHideControlsTimer();
     }
     seekBar.addEventListener('change', finishSeeking);
+    seekBar.addEventListener('pointerup', () => seekBar.blur()); // so arrow keys go back to the player shortcuts
     seekBar.addEventListener('pointerup', finishSeeking);
     seekBar.addEventListener('pointercancel', finishSeeking);
     seekBar.addEventListener('blur', finishSeeking);
@@ -1979,7 +2169,8 @@
     });
 
     // Playback Buttons
-    playPauseBtn.addEventListener('click', () => {
+    function togglePlayback() {
+      if (!videoPlayer.getAttribute('src')) return;
       if (videoPlayer.paused) {
         videoPlayer.play().catch(() => {});
         emitPlaybackAction('PLAY');
@@ -1987,7 +2178,8 @@
         videoPlayer.pause();
         emitPlaybackAction('PAUSE');
       }
-    });
+    }
+    playPauseBtn.addEventListener('click', togglePlayback);
 
     videoPlayer.addEventListener('play', () => {
       playPauseBtn.innerHTML = `<i class="fa-solid fa-pause text-xs sm:text-sm"></i>`;
@@ -1999,6 +2191,7 @@
 
     speedSelect.addEventListener('change', (e) => {
       const rate = parseFloat(e.target.value);
+      baseRate = rate;
       videoPlayer.playbackRate = rate;
       emitPlaybackAction('RATE', { rate });
     });
@@ -2106,6 +2299,7 @@
     // Coordinates are normalized to the player so every peer animates at the same location.
     function emitReaction(emoji) {
       if (typeof emoji !== 'string' || !emoji || emoji.length > 8) return;
+      syncDebug('reaction-send', { emoji, isHost, openConnectionCount: activeConnections.filter(c => c.open).length });
       const packet = {
         type: 'EMOJI_REACTION',
         emoji,
@@ -2128,6 +2322,7 @@
       const button = event.target.closest('.reaction-trigger');
       if (!button || !videoContainer.contains(button)) return;
       event.preventDefault();
+      event.stopPropagation();
       emitReaction(button.dataset.emoji);
       if (button.closest('#reactionTray')) toggleReactionTray(false);
     });
@@ -2135,16 +2330,26 @@
     function triggerFloatingEmoji(emoji, x, y, drift) {
       const layer = document.getElementById('reactionLayer');
       if (!layer || typeof emoji !== 'string') return;
+      while (layer.childElementCount >= 40) layer.firstElementChild.remove();
       const el = document.createElement('span');
       el.className = 'floating-reaction';
       el.textContent = emoji;
-      el.style.setProperty('--x', `${Number.isFinite(x) ? Math.min(94, Math.max(6, x)) : 50}%`);
-      el.style.setProperty('--y', `${Number.isFinite(y) ? Math.min(90, Math.max(5, y)) : 8}%`);
-      el.style.setProperty('--drift', `${Number.isFinite(drift) ? Math.min(45, Math.max(-45, drift)) : 0}px`);
+      el.style.left = `${Number.isFinite(x) ? Math.min(94, Math.max(6, x)) : 50}%`;
+      el.style.bottom = '12%';
       layer.appendChild(el);
-      el.addEventListener('animationend', () => el.remove(), { once: true });
-      // Guard against orphaned nodes if animationend is not fired by the browser.
-      window.setTimeout(() => el.remove(), 2600);
+      const dx = Number.isFinite(drift) ? Math.min(60, Math.max(-60, drift)) : 0;
+      const rise = Math.max(140, (layer.clientHeight || 300) * 0.6); // real pixels, not % of the emoji
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const frames = reduced
+        ? [{ opacity: 0, transform: 'scale(.9)' }, { opacity: 1, transform: 'scale(1.1)', offset: 0.2 }, { opacity: 1, offset: 0.8 }, { opacity: 0 }]
+        : [{ transform: 'translate3d(0,0,0) scale(.6) rotate(-8deg)', opacity: 0 },
+           { opacity: 1, offset: 0.12 },
+           { transform: `translate3d(${dx}px,${-rise}px,0) scale(1.2) rotate(12deg)`, opacity: 0 }];
+      const done = () => el.remove();
+      if (el.animate) {
+        el.animate(frames, { duration: reduced ? 1400 : 2400, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'forwards' }).onfinish = done;
+      }
+      window.setTimeout(done, 3000);
     }
 
     // Live Chat
@@ -2169,12 +2374,63 @@
       else if (activeConnections[0]) activeConnections[0].send(payload);
     });
 
+    const BASE_TITLE = document.title;
+    let sidebarInView = true;
+    function chatSeen() {
+      return !document.hidden && sidebarInView && !document.fullscreenElement &&
+        !document.getElementById('tabChatContent').classList.contains('hidden');
+    }
+    function updateUnreadUI() {
+      let badge = document.getElementById('chatUnreadBadge');
+      if (unreadChatCount > 0) {
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.id = 'chatUnreadBadge';
+          badge.className = 'chat-unread-badge';
+          badge.setAttribute('aria-label', 'Unread messages');
+          tabChatBtn.appendChild(badge);
+        }
+        badge.textContent = unreadChatCount > 99 ? '99+' : String(unreadChatCount);
+      } else if (badge) {
+        badge.remove();
+      }
+      document.title = unreadChatCount > 0 ? `(${unreadChatCount}) ${BASE_TITLE}` : BASE_TITLE;
+    }
+    function clearUnread() { if (unreadChatCount) { unreadChatCount = 0; updateUnreadUI(); } }
+    const sidePaneEl = document.getElementById('sidePane');
+    if (sidePaneEl && 'IntersectionObserver' in window) {
+      new IntersectionObserver(entries => {
+        sidebarInView = entries[0].intersectionRatio > 0.4;
+        if (chatSeen()) clearUnread();
+      }, { threshold: [0, 0.4, 1] }).observe(sidePaneEl);
+    }
+    document.addEventListener('visibilitychange', () => { if (chatSeen()) clearUnread(); });
+    window.addEventListener('focus', () => { if (chatSeen()) clearUnread(); });
+    document.addEventListener('fullscreenchange', () => { if (chatSeen()) clearUnread(); });
+
+    function notifyIncomingChat(msg) {
+      // Badge + tab title when the chat is not actually in front of the person.
+      if (!chatSeen()) { unreadChatCount += 1; updateUnreadUI(); }
+      // Toast over the player (also works in fullscreen) unless they are typing in chat right now.
+      if (!fullscreenChatToast || document.activeElement === chatInput) return;
+      fullscreenChatSender.textContent = `${msg.senderName || 'Someone'} sent a message`;
+      fullscreenChatPreview.textContent = String(msg.text || '');
+      fullscreenChatToast.hidden = false;
+      requestAnimationFrame(() => fullscreenChatToast.classList.add('visible'));
+      clearTimeout(chatToastTimer);
+      chatToastTimer = setTimeout(() => {
+        fullscreenChatToast.classList.remove('visible');
+        setTimeout(() => { if (!fullscreenChatToast.classList.contains('visible')) fullscreenChatToast.hidden = true; }, 200);
+      }, 3500);
+    }
+
     function appendChatMessage(msg) {
       const isMe = msg.senderId === myProfile.id;
+      if (!isMe) notifyIncomingChat(msg);
       const dateStr = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
       const div = document.createElement('div');
-      div.className = `flex flex-col ${isMe ? 'items-end' : 'items-start'} space-y-1`;
+      div.className = `flex flex-col ${isMe ? 'items-end' : 'items-start'} space-y-1${isMe ? '' : ' chat-flash'}`;
       div.innerHTML = `
         <div class="flex items-center gap-1.5 text-[10px] text-slate-400">
           <span style="color:${msg.color}" class="font-bold">${escapeHtml(msg.senderName)}</span>
@@ -2222,12 +2478,12 @@
     }
 
     // Sidebar Tabs
-    const tabChatBtn = document.getElementById('tabChatBtn');
     const tabUsersBtn = document.getElementById('tabUsersBtn');
     const tabChatContent = document.getElementById('tabChatContent');
     const tabUsersContent = document.getElementById('tabUsersContent');
 
     tabChatBtn.addEventListener('click', () => {
+      clearUnread();
       tabChatBtn.className = "flex-1 py-3 font-semibold text-xs border-b-2 border-indigo-500 text-indigo-400 flex items-center justify-center gap-2 transition-colors";
       tabUsersBtn.className = "flex-1 py-3 font-semibold text-xs border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center justify-center gap-2 transition-colors";
       tabChatContent.classList.remove('hidden');
@@ -2429,7 +2685,8 @@
     document.addEventListener('keydown', event => {
       const target = event.target;
       const typing = target instanceof HTMLElement &&
-        (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
+        (target.isContentEditable || /^(TEXTAREA|SELECT)$/.test(target.tagName) ||
+         (target.tagName === 'INPUT' && target.type !== 'range'));
       if (typing || event.altKey || event.ctrlKey || event.metaKey) return;
       if (!roomScreen || roomScreen.classList.contains('hidden')) return;
 
@@ -2438,18 +2695,17 @@
           key === 'arrowup' || key === 'arrowdown') event.preventDefault();
 
       if (key === ' ' ) {
-        if (videoPlayer.paused) { videoPlayer.play().catch(() => {}); onGlobalPlay(); }
-        else { videoPlayer.pause(); onGlobalPause(); }
+        togglePlayback();
       } else if (key === 'arrowright' || key === 'arrowleft') {
         const direction = key === 'arrowright' ? 1 : -1;
         const duration = Number.isFinite(videoPlayer.duration) ? videoPlayer.duration : Infinity;
         const targetTime = Math.max(0, Math.min(duration, videoPlayer.currentTime + direction * 10));
         videoPlayer.currentTime = targetTime;
-        onGlobalSeek(targetTime);
+        emitPlaybackAction('SEEK', { currentTime: targetTime, source: 'keyboard' });
         showVLCVisualHUD(direction > 0 ? 'fa-forward' : 'fa-backward', `${direction > 0 ? '+' : '-'}10 seconds`, 100);
       } else if (key === 'arrowup' || key === 'arrowdown') {
         const direction = key === 'arrowup' ? 1 : -1;
-        onLocalVolumeChange(videoPlayer.volume + direction * 0.05);
+        setLocalVolume(videoPlayer.volume + direction * 0.05);
       } else if (key === 'f') {
         if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
         else videoContainer.requestFullscreen?.().catch(() => showToast('Fullscreen unavailable.', 'info'));
@@ -2488,7 +2744,6 @@
       });
       select.onchange = () => {
         Array.from(tracks).forEach((track, index) => { track.selected = index === Number(select.value); });
-        onLocalTrackToggle();
       };
     }
     videoPlayer.addEventListener('loadedmetadata', refreshNativeVideoTracks);
@@ -2497,8 +2752,6 @@
     // WebVTT tracks and audioTracks are browser/codec-dependent. MKV support also
     // depends on the browser's demuxer; unsupported files require transcoding or
     // a compatible browser codec and cannot be enabled by frontend code alone.
-    audioTrackSelect.addEventListener('change', onLocalTrackToggle);
-    subTrackSelect.addEventListener('change', onLocalTrackToggle);
     // Volume slider is wired once above through setLocalVolume().
 
     // Keep pinch/selection browser behavior out of the actual player surface.
@@ -2507,6 +2760,19 @@
       if (videoContainer.contains(event.target)) event.preventDefault();
     }, { passive: false });
 
+    // ---- Production additions ----
+    let pendingAutoplay = false; // browser blocked autoplay: start on the next tap
+    videoContainer.addEventListener('pointerdown', () => {
+      if (pendingAutoplay && lastHostState?.isPlaying && videoPlayer.paused) videoPlayer.play().catch(() => {});
+      pendingAutoplay = false;
+    });
+    // A guest who picks their file after the host started gets synced the moment it loads.
+    videoPlayer.addEventListener('loadedmetadata', () => { if (!isHost && lastHostState) applyRemoteSyncState(lastHostState); });
+    // Space on a focused button fires on key-up; keydown already handled it (avoids double toggle).
+    document.addEventListener('keyup', e => {
+      if (e.key === ' ' && roomScreen && !roomScreen.classList.contains('hidden') &&
+          !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName || '')) e.preventDefault();
+    });
   </script>
 </body>
 </html>
